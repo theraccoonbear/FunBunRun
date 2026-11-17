@@ -15,6 +15,21 @@ test('the debug hook is only installed with ?debug', async ({ page }) => {
   expect(await page.evaluate(() => typeof window.__fbr)).toBe('undefined');
 });
 
+test('?seed=123 produces the same world layout on every load', async ({ page }) => {
+  const layout = async (url: string): Promise<{ seed: number; layout: unknown }> => {
+    await page.goto(url);
+    await expect(page.locator('canvas')).toBeVisible();
+    const snap = await page.evaluate(snapshot);
+    return { seed: snap.seed, layout: snap.layout };
+  };
+  const first = await layout('./?debug&seed=123');
+  const second = await layout('./?debug&seed=123');
+  const other = await layout('./?debug&seed=124');
+  expect(first.seed).toBe(123);
+  expect(second).toEqual(first);
+  expect(other.layout).not.toEqual(first.layout);
+});
+
 test('keyboard input runs and jumps the dog and the leash holds', async ({ page }) => {
   const errors: Error[] = [];
   page.on('pageerror', (err) => errors.push(err));

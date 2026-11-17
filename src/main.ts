@@ -1,6 +1,6 @@
 import { BUNNY, MAX_FRAME_DT } from './config';
 import { startLoop } from './core/loop';
-import { mathRandomRng } from './core/rng';
+import { mathRandomRng, parseSeed } from './core/rng';
 import { createSfx } from './audio/sfx';
 import { installDebugHook } from './debug';
 import { Actions, EdgeDetector } from './input/actions';
@@ -11,7 +11,7 @@ import { detectTouch, TouchControls } from './input/touch';
 import { loadBest, localStore, saveBest } from './platform/storage';
 import { followCamera, menuCamera } from './render/camera';
 import { Hearts, TrailView, updateSniffAtmosphere } from './render/fx';
-import { makeProps } from './render/models';
+import { disposeProps, makeProps } from './render/models';
 import { configureColorPipeline, createScene } from './render/scene';
 import { BonesView, BunnyView, DogView, PersonView } from './render/views';
 import { Game } from './sim/game';
@@ -26,9 +26,15 @@ const store = localStore();
 // Cosmetic randomness (grass speckles, heart bursts) stays separate from the sim stream.
 const fxRng = mathRandomRng();
 const kit = createScene(isTouch, fxRng);
-const game = new Game({ best: loadBest(store) });
+// `?seed=<n>` forces the world seed for every round; otherwise each round draws a random one.
+const forcedSeed = parseSeed(location.search);
+const game = new Game({
+  best: loadBest(store),
+  ...(forcedSeed === null ? {} : { seed: forcedSeed }),
+});
 
-kit.scene.add(makeProps(game.world));
+let props = makeProps(game.world);
+kit.scene.add(props);
 const dogView = new DogView(kit.scene);
 const bunnyView = new BunnyView(kit.scene);
 const bonesView = new BonesView(kit.scene, game.bones.length);
@@ -64,6 +70,12 @@ function showMenu(summary: Parameters<Menu['show']>[0]): void {
   menu.show(summary);
 }
 
+game.events.on('world', () => {
+  kit.scene.remove(props);
+  disposeProps(props);
+  props = makeProps(game.world);
+  kit.scene.add(props);
+});
 game.events.on('start', () => {
   dogView.place(game.dog);
   personView.bind(game.rag);

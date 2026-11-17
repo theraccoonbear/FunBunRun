@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createRng, mathRandomRng } from '../../src/core/rng';
+import {
+  createRng,
+  deriveSeed,
+  mathRandomRng,
+  parseSeed,
+  randomSeed,
+  rngFrom,
+} from '../../src/core/rng';
 
 const sample = (seed: number, n: number): number[] => {
   const rng = createRng(seed);
@@ -54,6 +61,41 @@ describe('createRng', () => {
 
   it('pick() throws on an empty array', () => {
     expect(() => createRng(1).pick([])).toThrow();
+  });
+});
+
+describe('randomSeed', () => {
+  it('returns a 32-bit unsigned integer from the source', () => {
+    expect(randomSeed(rngFrom(() => 0.5))).toBe(2147483648);
+    expect(randomSeed(rngFrom(() => 0.999999999))).toBeLessThanOrEqual(0xffffffff);
+    expect(randomSeed(rngFrom(() => 0))).toBe(0);
+  });
+});
+
+describe('deriveSeed', () => {
+  it('is deterministic, 32-bit, and differs per salt and per seed', () => {
+    expect(deriveSeed(5, 1)).toBe(deriveSeed(5, 1));
+    expect(deriveSeed(5, 1)).not.toBe(deriveSeed(5, 2));
+    expect(deriveSeed(5, 1)).not.toBe(deriveSeed(6, 1));
+    expect(deriveSeed(5, 1)).not.toBe(5);
+    expect(Number.isInteger(deriveSeed(0xffffffff, 7))).toBe(true);
+    expect(deriveSeed(0xffffffff, 7)).toBeLessThanOrEqual(0xffffffff);
+  });
+});
+
+describe('parseSeed', () => {
+  it('reads a non-negative 32-bit integer', () => {
+    expect(parseSeed('?seed=123')).toBe(123);
+    expect(parseSeed('?debug&seed=0')).toBe(0);
+    expect(parseSeed('?seed=4294967295')).toBe(4294967295);
+  });
+
+  it('ignores missing or invalid values', () => {
+    for (const q of ['', '?debug', '?seed=', '?seed=abc', '?seed=-1', '?seed=1.5']) {
+      expect(parseSeed(q)).toBeNull();
+    }
+    expect(parseSeed('?seed=4294967296')).toBeNull();
+    expect(parseSeed('?seed=99999999999')).toBeNull();
   });
 });
 

@@ -180,6 +180,18 @@ export function makeBone(mat: THREE.Material): THREE.Group {
   return g;
 }
 
+/** Frees the GPU resources of a group built by `makeProps`. */
+export function disposeProps(group: THREE.Group): void {
+  group.traverse((o) => {
+    if (o instanceof THREE.Mesh) {
+      const mesh = o as THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]>;
+      mesh.geometry.dispose();
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      mats.forEach((m) => m.dispose());
+    }
+  });
+}
+
 /** Static props for a generated world; geometry and materials are shared per kind. */
 export function makeProps(world: World): THREE.Group {
   const g = new THREE.Group();

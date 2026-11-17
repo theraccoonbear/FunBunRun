@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { LEASH_LENGTH, ROUND_SECONDS, RULES, YANK_MESSAGES } from '../../src/config';
-import { createRng } from '../../src/core/rng';
+import { LEASH_LENGTH, ROUND_SECONDS, RULES, WORLD, YANK_MESSAGES } from '../../src/config';
+import { closestOnSegment } from '../../src/core/math';
 import { Game, type FrameInput, type GameEvents } from '../../src/sim/game';
 
 const DT = 1 / 60;
@@ -16,7 +16,7 @@ const idle: FrameInput = {
 };
 
 function newGame(best = 0): Game {
-  return new Game({ rng: createRng(42), best });
+  return new Game({ seed: 42, best });
 }
 
 describe('Game', () => {
@@ -31,11 +31,94 @@ describe('Game', () => {
     expect(newGame().bones).toEqual(newGame().bones);
   });
 
-  it('defaults to Math.random', () => {
+  it('draws a random seed by default', () => {
     const spy = vi.spyOn(Math, 'random');
     new Game();
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
+  });
+
+  it('exposes the forced seed and differs across seeds', () => {
+    const a = new Game({ seed: 1 });
+    const b = new Game({ seed: 2 });
+    expect(a.seed).toBe(1);
+    expect(a.world).not.toEqual(b.world);
+    expect(a.bones).not.toEqual(b.bones);
+  });
+
+  it('places bones clear of obstacles and the spawn, and keeps respawns clear', () => {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const g = new Game({ seed });
+      expect(g.bones).toHaveLength(WORLD.bones.count);
+      for (const bone of g.bones) {
+        expect(Math.hypot(bone.x, bone.z)).toBeGreaterThanOrEqual(WORLD.spawnClearRadius);
+        for (const o of g.world.obstacles) {
+          const c = closestOnSegment(o, bone.x, bone.z, { x: 0, z: 0 });
+          expect(Math.hypot(bone.x - c.x, bone.z - c.z)).toBeGreaterThanOrEqual(
+            o.r + WORLD.bones.clearance - 1e-9,
+          );
+        }
+      }
+    }
+  });
+
+  it('respawns collected bones reproducibly for a seed', () => {
+    const run = (): number[] => {
+      const g = new Game({ seed: 8 });
+      g.start();
+      const target = g.bones[0]!;
+      g.dog.pos.x = target.x;
+      g.dog.pos.z = target.z;
+      g.update(DT, idle);
+      return g.bones.flatMap((b) => [b.x, b.z]);
+    };
+    const first = run();
+    expect(run()).toEqual(first);
+    expect(first).not.toEqual(new Game({ seed: 8 }).bones.flatMap((b) => [b.x, b.z]));
+  });
+
+  it('keeps the world layout independent of gameplay randomness', () => {
+    const a = new Game({ seed: 9 });
+    const b = new Game({ seed: 9 });
+    for (let i = 0; i < 100; i++) {
+      b.rng.next();
+    }
+    expect(b.world).toEqual(a.world);
+    expect(b.bones).toEqual(a.bones);
+  });
+
+  it('gives each round a new seed unless one is forced', () => {
+    const g = new Game();
+    const first = g.seed;
+    const onWorld = vi.fn();
+    g.events.on('world', onWorld);
+    g.start();
+    expect(g.seed).toBe(first);
+    g.session.phase = 'over';
+    g.start();
+    expect(onWorld).toHaveBeenCalledOnce();
+    expect(g.seed).not.toBe(first);
+  });
+
+  it('regenerates the identical world every round with a forced seed', () => {
+    const g = new Game({ seed: 77 });
+    const world = structuredClone(g.world);
+    const bones = structuredClone(g.bones);
+    g.start();
+    g.bones[0]!.x += 5;
+    g.session.phase = 'over';
+    g.start();
+    expect(g.world).toEqual(world);
+    expect(g.bones).toEqual(bones);
+  });
+
+  it('reports the world seed with the round result', () => {
+    const g = new Game({ seed: 123 });
+    const over = vi.fn<(r: GameEvents['roundOver']) => void>();
+    g.events.on('roundOver', over);
+    g.start();
+    g.update(ROUND_SECONDS + 1, idle);
+    expect(over.mock.calls[0]![0].seed).toBe(123);
   });
 
   it('only animates the bunny in the menu', () => {

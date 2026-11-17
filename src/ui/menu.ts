@@ -6,6 +6,8 @@ export interface RoundSummary {
   dragged: number;
   newBest: boolean;
   best: number;
+  /** World seed of the round, shown so a layout can be reproduced. */
+  seed: number;
 }
 
 const TOUCH_CONTROLS =
@@ -28,6 +30,8 @@ export function menuHtml(isTouch: boolean, summary: RoundSummary | null): string
       ' m</b></p>' +
       '<p>' +
       (summary.newBest ? 'New best!' : 'Best: ' + summary.best) +
+      "</p><p class='seed' style='font-size:12px;opacity:.6'>World #" +
+      summary.seed +
       '</p>';
   } else {
     html +=
