@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ARENA_HALF, CAMERA, COLORS, SNIFF } from '../config';
 import type { Rng } from '../core/rng';
+import { cappedPixelRatio, viewportSize } from './viewport';
 
 /**
  * Colour pipeline matching the r128 prototype. r128 rendered with
@@ -39,8 +40,9 @@ export interface SceneKit {
 export function createScene(isTouch: boolean, rng: Rng): SceneKit {
   const renderer = new THREE.WebGLRenderer({ antialias: !isTouch });
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-  renderer.setSize(innerWidth, innerHeight);
+  const initial = viewportSize(window);
+  renderer.setPixelRatio(cappedPixelRatio(window.devicePixelRatio));
+  renderer.setSize(initial.width, initial.height);
   document.body.insertBefore(renderer.domElement, document.body.firstChild);
 
   const scene = new THREE.Scene();
@@ -52,7 +54,7 @@ export function createScene(isTouch: boolean, rng: Rng): SceneKit {
   scene.fog = fog;
   const camera = new THREE.PerspectiveCamera(
     CAMERA.fov,
-    innerWidth / innerHeight,
+    initial.width / initial.height,
     CAMERA.near,
     CAMERA.far,
   );
@@ -74,9 +76,11 @@ export function createScene(isTouch: boolean, rng: Rng): SceneKit {
     sniffSky,
     render: () => renderer.render(scene, camera),
     resize: () => {
-      camera.aspect = innerWidth / innerHeight;
+      const { width, height } = viewportSize(window);
+      renderer.setPixelRatio(cappedPixelRatio(window.devicePixelRatio));
+      renderer.setSize(width, height);
+      camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.setSize(innerWidth, innerHeight);
     },
   };
 }
