@@ -44,3 +44,12 @@ export function loadBest(store: KeyValueStore): number {
 export function saveBest(store: KeyValueStore, best: number): void {
   store.set(STORAGE_KEYS.best, String(best));
 }
+
+/** Mute setting; anything but '1' reads as not muted. */
+export function loadMuted(store: KeyValueStore): boolean {
+  return store.get(STORAGE_KEYS.muted) === '1';
+}
+
+export function saveMuted(store: KeyValueStore, muted: boolean): void {
+  store.set(STORAGE_KEYS.muted, muted ? '1' : '0');
+}

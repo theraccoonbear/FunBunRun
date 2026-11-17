@@ -200,6 +200,8 @@ export const RAGDOLL = {
 
 export const STORAGE_KEYS = {
   best: 'funbunrun-best',
+  /** '1' when sound is muted (#8, #13). */
+  muted: 'funbunrun-muted',
 } as const;
 
 export const SNIFF = {

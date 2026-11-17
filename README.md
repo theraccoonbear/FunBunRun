@@ -19,6 +19,7 @@ Live: <https://theraccoonbear.github.io/FunBunRun/>
 | E / F / mouse click   | Lick                           |
 | Q (hold)              | Sniff, to track the bunny      |
 | Enter                 | Start or restart from the menu |
+| M                     | Mute or unmute (remembered)    |
 
 ### Touch
 
@@ -26,6 +27,7 @@ Live: <https://theraccoonbear.github.io/FunBunRun/>
 - Right side of the screen: drag to swing the camera.
 - LICK glows when the bunny is within reach.
 - JUMP clears logs. Hold SNIFF to track the bunny.
+- The ♪ button (top right) mutes. If the browser kept sound off, a "Tap for sound" button appears below it.
 
 ### Gamepad
 

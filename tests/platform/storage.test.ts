@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { STORAGE_KEYS } from '../../src/config';
-import { loadBest, localStore, memoryStore, saveBest } from '../../src/platform/storage';
+import {
+  loadBest,
+  loadMuted,
+  localStore,
+  memoryStore,
+  saveBest,
+  saveMuted,
+} from '../../src/platform/storage';
 
 describe('storage', () => {
   it('round-trips the best score under the prototype key', () => {
@@ -10,6 +17,17 @@ describe('storage', () => {
     expect(s.get(STORAGE_KEYS.best)).toBe('1200');
     expect(STORAGE_KEYS.best).toBe('funbunrun-best');
     expect(loadBest(s)).toBe(1200);
+  });
+
+  it('round-trips the mute setting, defaulting to sound on', () => {
+    const s = memoryStore();
+    expect(loadMuted(s)).toBe(false);
+    saveMuted(s, true);
+    expect(s.get(STORAGE_KEYS.muted)).toBe('1');
+    expect(loadMuted(s)).toBe(true);
+    saveMuted(s, false);
+    expect(loadMuted(s)).toBe(false);
+    expect(loadMuted(memoryStore({ [STORAGE_KEYS.muted]: 'yes' }))).toBe(false);
   });
 
   it('reads garbage as 0', () => {
