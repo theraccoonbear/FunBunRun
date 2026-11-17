@@ -188,6 +188,16 @@ describe('Game', () => {
     expect(g.scent.drops.every((d) => d.age > 12)).toBe(true);
   });
 
+  it('starts each round with no leftover physics time', () => {
+    const g = newGame();
+    g.start();
+    g.update(0.01, idle);
+    expect(g.physics.pending).toBeCloseTo(0.01);
+    g.session.phase = 'over';
+    g.start();
+    expect(g.physics.pending).toBe(0);
+  });
+
   it('drops scent behind the bunny every quarter second', () => {
     const g = newGame();
     g.start();

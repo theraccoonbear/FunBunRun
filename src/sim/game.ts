@@ -89,7 +89,8 @@ export class Game {
   sprinting = false;
   /** Lick timer as it was when the dog moved this frame (drives the head and tongue pose). */
   dogLickT = 0;
-  private readonly physics = new FixedStepper(RAGDOLL.step, RAGDOLL.maxStepsPerFrame);
+  /** Fixed-step clock for the person and leash physics. */
+  readonly physics = new FixedStepper(RAGDOLL.step, RAGDOLL.maxStepsPerFrame);
   private readonly ragCollide = (p: Particle): void =>
     collide(this.world.obstacles, this.world.half, p, p.r, 0);
 
@@ -117,6 +118,8 @@ export class Game {
     resetLook(this.look);
     resetBunny(this.bunny);
     this.rag = this.buildPerson();
+    // Leftover time from the previous round must not step the new ragdoll.
+    this.physics.reset();
     clearScentTrail(this.scent);
     this.events.emit('start', undefined);
     return true;
