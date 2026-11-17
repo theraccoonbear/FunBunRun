@@ -17,6 +17,8 @@ export class Keyboard {
     private readonly hooks: KeyboardHooks,
   ) {}
 
+  private readonly axis = (c: string): number => (this.isDown(c) ? 1 : 0);
+
   isDown(code: string): boolean {
     return this.keys.get(code) ?? false;
   }
@@ -52,7 +54,7 @@ export class Keyboard {
   /** Writes this frame's held-key state into the actions (sets, not adds). */
   apply(): void {
     const a = this.actions;
-    const k = (c: string): number => (this.isDown(c) ? 1 : 0);
+    const k = this.axis;
     a.moveX = k('KeyD') - k('KeyA');
     a.moveY =
       (this.isDown('KeyW') || this.isDown('ArrowUp') ? 1 : 0) -

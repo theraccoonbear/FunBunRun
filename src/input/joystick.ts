@@ -32,7 +32,7 @@ export function moveJoystick(
 ): Joystick {
   let dx = px - j.originX;
   let dy = py - j.originY;
-  const d = Math.hypot(dx, dy);
+  const d = Math.sqrt(dx * dx + dy * dy);
   const follow = radius * INPUT.joystickFollow;
   if (d > follow) {
     const k = (d - follow) / d;
@@ -41,7 +41,7 @@ export function moveJoystick(
     dx = px - j.originX;
     dy = py - j.originY;
   }
-  const dd = Math.hypot(dx, dy);
+  const dd = Math.sqrt(dx * dx + dy * dy);
   const cl = Math.min(1, dd / radius);
   const nx = dd > 0 ? dx / dd : 0;
   const ny = dd > 0 ? dy / dd : 0;

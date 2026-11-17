@@ -17,7 +17,7 @@ import { BonesView, BunnyView, DogView, PersonView } from './render/views';
 import { Game } from './sim/game';
 import { SimRunner } from './sim/runner';
 import { formatClock } from './sim/rules';
-import { $, Hud } from './ui/hud';
+import { $, Hud, type HudFrame } from './ui/hud';
 import { Menu } from './ui/menu';
 
 configureColorPipeline();
@@ -117,6 +117,17 @@ attachPointer(kit.renderer.domElement, actions, { isPlaying, isTouch });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 const padEdges = new EdgeDetector();
 
+/** Reused every frame so the HUD update allocates nothing. */
+const hudFrame: HudFrame = {
+  clock: '',
+  score: 0,
+  licks: 0,
+  stamina: 1,
+  lickReady: false,
+  arrow: null,
+};
+let clockSecs = Number.NaN;
+
 /** One rendered frame: sample input, run the sim steps due, draw the interpolated state. */
 function frame(dt: number): void {
   keyboard.apply();
@@ -147,14 +158,18 @@ function frame(dt: number): void {
       const cy = Math.cos(r.camYaw);
       arrow = Math.atan2(dx * cy - dz * sy, -dx * sy - dz * cy);
     }
-    hud.update({
-      clock: formatClock(s.timeLeft),
-      score: s.score,
-      licks: s.licks,
-      stamina: game.dog.stam,
-      lickReady: game.reach.ok,
-      arrow,
-    });
+    // The clock text only changes once a second.
+    const secs = Math.ceil(s.timeLeft);
+    if (secs !== clockSecs) {
+      clockSecs = secs;
+      hudFrame.clock = formatClock(s.timeLeft);
+    }
+    hudFrame.score = s.score;
+    hudFrame.licks = s.licks;
+    hudFrame.stamina = game.dog.stam;
+    hudFrame.lickReady = game.reach.ok;
+    hudFrame.arrow = arrow;
+    hud.update(hudFrame);
   } else {
     menuCamera(kit.camera, r.elapsed);
     bunnyView.syncMenu(r.bunny.hopT, r.elapsed, BUNNY.start.x, BUNNY.start.z);

@@ -121,6 +121,21 @@ export function makeRagdollSim(opts: RagdollOptions): Ragdoll {
   C(b.lKnee, b.rKnee, 0.3);
   C(b.lElbow, b.rElbow, 0.15);
   const bodyPts = pts.slice();
+  // Particles the standing pose pulls toward, and their per-step target buffer (x, y, z each).
+  const poseParts: Particle[] = [
+    b.lFoot,
+    b.rFoot,
+    b.lKnee,
+    b.rKnee,
+    b.pelvis,
+    b.neck,
+    b.head,
+    b.rElbow,
+    b.rHand,
+    b.lElbow,
+    b.lHand,
+  ];
+  const poseTargets = new Float64Array(poseParts.length * 3);
 
   // Leash rope: rope[0] pinned to the dog collar, last point is the person's right hand
   const L = opts.leash;
@@ -163,7 +178,7 @@ export function makeRagdollSim(opts: RagdollOptions): Ragdoll {
     const dx = bb.x - a.x;
     const dy = bb.y - a.y;
     const dz = bb.z - a.z;
-    const d = Math.hypot(dx, dy, dz) || 1e-6;
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1e-6;
     if (c.rope && d < c.len) {
       return; // ropes only pull
     }
@@ -227,7 +242,7 @@ export function makeRagdollSim(opts: RagdollOptions): Ragdoll {
       const Fz = (b.lFoot.z + b.rFoot.z) / 2;
       let fx = collar.x - Fx;
       let fz = collar.z - Fz;
-      const fd = Math.hypot(fx, fz) || 1;
+      const fd = Math.sqrt(fx * fx + fz * fz) || 1;
       fx /= fd;
       fz /= fd;
       const rx = -fz;
@@ -243,43 +258,51 @@ export function makeRagdollSim(opts: RagdollOptions): Ragdoll {
         st.swing *= RAGDOLL.swingDecay;
       }
       const swing = st.swing;
-      const T = (x: number, y: number, z: number): [number, number, number] => [x, y, z];
-      const pose: [Particle, [number, number, number]][] = [
-        [b.lFoot, T(Fx - rx * 0.12 + fx * swing * 0.25, 0.08, Fz - rz * 0.12 + fz * swing * 0.25)],
-        [b.rFoot, T(Fx + rx * 0.12 - fx * swing * 0.25, 0.08, Fz + rz * 0.12 - fz * swing * 0.25)],
-        [
-          b.lKnee,
-          T(
-            Fx - rx * 0.12 + fx * (0.06 + swing * 0.12),
-            0.5,
-            Fz - rz * 0.12 + fz * (0.06 + swing * 0.12),
-          ),
-        ],
-        [
-          b.rKnee,
-          T(
-            Fx + rx * 0.12 + fx * (0.06 - swing * 0.12),
-            0.5,
-            Fz + rz * 0.12 + fz * (0.06 - swing * 0.12),
-          ),
-        ],
-        [b.pelvis, T(Fx, 0.95, Fz)],
-        [b.neck, T(Fx + fx * 0.06, 1.4, Fz + fz * 0.06)],
-        [b.head, T(Fx + fx * 0.08, 1.62, Fz + fz * 0.08)],
-        [b.rElbow, T(Fx + rx * 0.25 + fx * 0.22, 1.2, Fz + rz * 0.25 + fz * 0.22)],
-        [b.rHand, T(Fx + rx * 0.2 + fx * 0.5, 1.15, Fz + rz * 0.2 + fz * 0.5)],
-        [b.lElbow, T(Fx - rx * 0.3 - fx * swing * 0.1, 1.15, Fz - rz * 0.3 - fz * swing * 0.1)],
-        [b.lHand, T(Fx - rx * 0.34 - fx * swing * 0.25, 0.9, Fz - rz * 0.34 - fz * swing * 0.25)],
-      ];
+      // Targets go into a preallocated buffer, in the order of `poseParts`.
+      const T = poseTargets;
+      T[0] = Fx - rx * 0.12 + fx * swing * 0.25;
+      T[1] = 0.08;
+      T[2] = Fz - rz * 0.12 + fz * swing * 0.25;
+      T[3] = Fx + rx * 0.12 - fx * swing * 0.25;
+      T[4] = 0.08;
+      T[5] = Fz + rz * 0.12 - fz * swing * 0.25;
+      T[6] = Fx - rx * 0.12 + fx * (0.06 + swing * 0.12);
+      T[7] = 0.5;
+      T[8] = Fz - rz * 0.12 + fz * (0.06 + swing * 0.12);
+      T[9] = Fx + rx * 0.12 + fx * (0.06 - swing * 0.12);
+      T[10] = 0.5;
+      T[11] = Fz + rz * 0.12 + fz * (0.06 - swing * 0.12);
+      T[12] = Fx;
+      T[13] = 0.95;
+      T[14] = Fz;
+      T[15] = Fx + fx * 0.06;
+      T[16] = 1.4;
+      T[17] = Fz + fz * 0.06;
+      T[18] = Fx + fx * 0.08;
+      T[19] = 1.62;
+      T[20] = Fz + fz * 0.08;
+      T[21] = Fx + rx * 0.25 + fx * 0.22;
+      T[22] = 1.2;
+      T[23] = Fz + rz * 0.25 + fz * 0.22;
+      T[24] = Fx + rx * 0.2 + fx * 0.5;
+      T[25] = 1.15;
+      T[26] = Fz + rz * 0.2 + fz * 0.5;
+      T[27] = Fx - rx * 0.3 - fx * swing * 0.1;
+      T[28] = 1.15;
+      T[29] = Fz - rz * 0.3 - fz * swing * 0.1;
+      T[30] = Fx - rx * 0.34 - fx * swing * 0.25;
+      T[31] = 0.9;
+      T[32] = Fz - rz * 0.34 - fz * swing * 0.25;
       const s = RAGDOLL.poseStrength * rec;
       const damp = 1 - RAGDOLL.poseDamping * rec;
-      for (const [p, t] of pose) {
+      for (let i = 0; i < poseParts.length; i++) {
+        const p = poseParts[i]!;
         const vx = (p.x - p.px) * damp;
         const vy = (p.y - p.py) * damp;
         const vz = (p.z - p.pz) * damp;
-        p.x += (t[0] - p.x) * s;
-        p.y += (t[1] - p.y) * s;
-        p.z += (t[2] - p.z) * s;
+        p.x += (T[i * 3]! - p.x) * s;
+        p.y += (T[i * 3 + 1]! - p.y) * s;
+        p.z += (T[i * 3 + 2]! - p.z) * s;
         p.px = p.x - vx;
         p.py = p.y - vy;
         p.pz = p.z - vz;
@@ -299,7 +322,7 @@ export function makeRagdollSim(opts: RagdollOptions): Ragdoll {
       const hx = b.rHand.x - collar.x;
       const hy = b.rHand.y - collar.y;
       const hz = b.rHand.z - collar.z;
-      const hd = Math.hypot(hx, hy, hz);
+      const hd = Math.sqrt(hx * hx + hy * hy + hz * hz);
       if (hd > L) {
         const k = L / hd;
         pull += hd - L;
@@ -319,7 +342,7 @@ export function makeRagdollSim(opts: RagdollOptions): Ragdoll {
 
     st.tension = Math.min(1, pull * RAGDOLL.tensionScale);
     // Only a moving dog knocks the human over; slack-taking while they get up does not
-    const cs = st.lc ? Math.hypot(collar.x - st.lc.x, collar.z - st.lc.z) / h : 0;
+    const cs = st.lc ? Math.sqrt((collar.x - st.lc.x) ** 2 + (collar.z - st.lc.z) ** 2) / h : 0;
     if (st.lc) {
       st.lc.x = collar.x;
       st.lc.z = collar.z;
@@ -334,7 +357,7 @@ export function makeRagdollSim(opts: RagdollOptions): Ragdoll {
       st.yanked = true;
     }
     if (b.head.y < RAGDOLL.draggedHeadHeight) {
-      st.dragged += Math.hypot(b.pelvis.x - pelX0, b.pelvis.z - pelZ0);
+      st.dragged += Math.sqrt((b.pelvis.x - pelX0) ** 2 + (b.pelvis.z - pelZ0) ** 2);
     }
   }
 

@@ -26,6 +26,7 @@ export class SimRunner {
   private prev = createRenderState();
   private curr = createRenderState();
   private readonly view = createRenderState();
+  private inputs: StepInputSource | null = null;
 
   constructor(
     readonly game: Game,
@@ -40,16 +41,20 @@ export class SimRunner {
 
   /** Feeds one frame's elapsed time and runs the steps due. Returns the step count. */
   frame(dt: number, input: StepInputSource): number {
-    return this.stepper.advance(dt, (h) => {
-      const t = this.ticks * h;
-      const done = this.prev;
-      this.prev = this.curr;
-      this.curr = done;
-      this.game.update(h, input.take(t));
-      this.ticks++;
-      captureState(this.game, this.curr);
-    });
+    this.inputs = input;
+    return this.stepper.advance(dt, this.runStep);
   }
+
+  /** One step, as a field so the per-frame call allocates no closure. */
+  private readonly runStep = (h: number): void => {
+    const t = this.ticks * h;
+    const done = this.prev;
+    this.prev = this.curr;
+    this.curr = done;
+    this.game.update(h, this.inputs!.take(t));
+    this.ticks++;
+    captureState(this.game, this.curr);
+  };
 
   /** Interpolation factor between the last two steps, 0..1. */
   get alpha(): number {

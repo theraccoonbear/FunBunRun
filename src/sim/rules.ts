@@ -23,7 +23,7 @@ export function lickReach(
 ): LickReach {
   out.dx = bunny.x - dog.x;
   out.dz = bunny.z - dog.z;
-  out.d = Math.hypot(out.dx, out.dz);
+  out.d = Math.sqrt(out.dx * out.dx + out.dz * out.dz);
   out.ok = out.d < RULES.lickRange && bunnyImmunity <= 0;
   return out;
 }
@@ -39,7 +39,7 @@ export function lickPoints(combo: number): number {
 
 /** Whether a bone is within pickup range. Pickups are allowed mid-air (#4). */
 export function canPickBone(dog: Readonly<Vec3>, boneX: number, boneZ: number): boolean {
-  return Math.hypot(boneX - dog.x, boneZ - dog.z) < RULES.bonePickupRange;
+  return Math.sqrt((boneX - dog.x) ** 2 + (boneZ - dog.z) ** 2) < RULES.bonePickupRange;
 }
 
 /** The best score after a round ending with `score`. */

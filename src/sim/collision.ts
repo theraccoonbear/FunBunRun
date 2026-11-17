@@ -24,9 +24,12 @@ export function collide(
     const cz = scratch.z;
     let dx = p.x - cx;
     let dz = p.z - cz;
-    const d = Math.hypot(dx, dz);
     const md = o.r + rad;
-    if (d < md) {
+    // Squared test first: most obstacles are out of reach, and Math.hypot
+    // allocates a heap number per call, thousands of times per step.
+    const d2 = dx * dx + dz * dz;
+    if (d2 < md * md) {
+      const d = Math.sqrt(d2);
       if (d < 1e-4) {
         dx = 1;
         dz = 0;

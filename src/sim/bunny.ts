@@ -68,7 +68,7 @@ export function updateBunny(
 ): number {
   const dx = b.pos.x - dog.x;
   const dz = b.pos.z - dog.z;
-  const dist = Math.hypot(dx, dz) || 0.001;
+  const dist = Math.sqrt(dx * dx + dz * dz) || 0.001;
   b.inv -= dt;
   b.jinkT -= dt;
   b.jinkCD -= dt;
@@ -124,7 +124,7 @@ export function updateBunny(
     closestOnSegment(o, b.pos.x, b.pos.z, scratch);
     const ox = b.pos.x - scratch.x;
     const oz = b.pos.z - scratch.z;
-    const d = Math.hypot(ox, oz);
+    const d = Math.sqrt(ox * ox + oz * oz);
     const reach = o.r + BUNNY.avoidReach;
     if (d < reach && d > 1e-4) {
       const w = ((reach - d) / BUNNY.avoidReach) * BUNNY.avoidStrength;
