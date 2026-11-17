@@ -51,17 +51,38 @@ export class Menu {
   constructor(
     private readonly overlay: HTMLElement,
     private readonly card: HTMLElement,
-    private readonly isTouch: boolean,
+    private isTouch: boolean,
     private readonly onStart: () => void,
   ) {}
 
+  private summary: RoundSummary | null = null;
+  private visible = false;
+
   show(summary: RoundSummary | null): void {
+    this.summary = summary;
+    this.visible = true;
     this.overlay.style.display = 'flex';
-    this.card.innerHTML = menuHtml(this.isTouch, summary);
-    this.card.querySelector('#go')?.addEventListener('click', this.onStart);
+    this.render();
   }
 
   hide(): void {
+    this.visible = false;
     this.overlay.style.display = 'none';
+  }
+
+  /** Switches between touch and desktop help when the last-used device changes. */
+  setTouch(isTouch: boolean): void {
+    if (isTouch === this.isTouch) {
+      return;
+    }
+    this.isTouch = isTouch;
+    if (this.visible) {
+      this.render();
+    }
+  }
+
+  private render(): void {
+    this.card.innerHTML = menuHtml(this.isTouch, this.summary);
+    this.card.querySelector('#go')?.addEventListener('click', this.onStart);
   }
 }

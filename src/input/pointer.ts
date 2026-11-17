@@ -2,22 +2,28 @@ import type { Actions } from './actions';
 
 export interface PointerHooks {
   isPlaying: () => boolean;
-  /** Touch devices use the touch layer instead of mouse look. */
-  isTouch: boolean;
 }
 
 /**
  * Mouse look: the first click captures the pointer (or drag-looks while
  * the lock request is pending or refused); clicks while captured lick.
+ * Always active: only `pointerType === 'mouse'` presses count, so the touch
+ * layer above the canvas neither blocks them nor reacts to them, and a
+ * finger never triggers mouse look (hybrid devices, #6).
  */
 export function attachPointer(
   canvas: HTMLCanvasElement,
+  layer: HTMLElement,
   actions: Actions,
   hooks: PointerHooks,
 ): void {
   let dragging = false;
-  canvas.addEventListener('mousedown', () => {
-    if (hooks.isTouch || !hooks.isPlaying()) {
+  addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse' || !hooks.isPlaying()) {
+      return;
+    }
+    // The menu card and buttons handle their own clicks.
+    if (e.target !== canvas && e.target !== layer) {
       return;
     }
     if (document.pointerLockElement === canvas) {
