@@ -28,7 +28,7 @@ export function resetLook(look: LookState): void {
 
 /**
  * Applies pointer/stick look deltas (pixels) and key turning (-1..1, positive
- * turns left) for one frame.
+ * turns left) for one sim step.
  */
 export function applyLook(
   look: LookState,

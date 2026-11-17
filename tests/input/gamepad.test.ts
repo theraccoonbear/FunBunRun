@@ -60,7 +60,7 @@ describe('pollGamepads', () => {
     const { actions, poll } = setup();
     poll(pad([PAD.x]));
     expect(actions.lick).toBe(true);
-    actions.endFrame();
+    actions.take();
     poll(pad([PAD.x]));
     expect(actions.lick).toBe(false);
     poll(pad([]));
@@ -76,7 +76,7 @@ describe('pollGamepads', () => {
       if (actions.lick) {
         licks++;
       }
-      actions.endFrame();
+      actions.take();
     }
     expect(licks).toBe(1);
   });

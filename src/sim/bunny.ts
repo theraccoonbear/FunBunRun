@@ -55,7 +55,7 @@ export function resetBunny(b: BunnyState): void {
 const scratch: Vec2 = { x: 0, z: 0 };
 
 /**
- * One frame of bunny AI: flee (with jinks) when the dog is near, wander
+ * One sim step of bunny AI: flee (with jinks) when the dog is near, wander
  * when it is far, tire out after a long chase, avoid tall obstacles and the
  * arena edge. Returns the distance to the dog.
  */
@@ -109,6 +109,8 @@ export function updateBunny(
       }
     }
   } else {
+    // Tuned per 60 Hz step. The sim always runs the fixed step, so the random
+    // walk is the same at any frame rate (#3).
     b.wander += (rng.next() - 0.5) * dt * BUNNY.wanderTurnNoise;
     wx = Math.sin(b.wander);
     wz = Math.cos(b.wander);

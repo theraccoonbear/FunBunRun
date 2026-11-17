@@ -50,6 +50,19 @@ describe('PersonView', () => {
     expect(head).toBeDefined();
   });
 
+  it('draws from interpolated positions when given them', () => {
+    const scene = new THREE.Scene();
+    const view = new PersonView(scene);
+    const r = rag();
+    view.bind(r);
+    const pts = r.pts.flatMap((p) => [p.x + 7, p.y, p.z]);
+    view.sync(pts);
+    const head = collect(scene).meshes.find(
+      (m) => m.position.x === r.body.head.x + 7 && m.position.y === r.body.head.y,
+    );
+    expect(head).toBeDefined();
+  });
+
   it('dispose() frees every geometry and material and leaves the scene', () => {
     const scene = new THREE.Scene();
     const view = new PersonView(scene);
