@@ -57,3 +57,24 @@ test('keyboard input runs and jumps the dog and the leash holds', async ({ page 
 
   expect(errors).toEqual([]);
 });
+
+test('props are instanced: few draw calls while playing', async ({ page }) => {
+  await page.goto('./?debug&seed=123');
+  await expect(page.locator('#overlay')).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#overlay')).toBeHidden();
+  await page.waitForTimeout(500);
+  const { render } = await page.evaluate(snapshot);
+  // About 165 before instancing (one mesh per prop part).
+  expect(render.calls).toBeGreaterThan(0);
+  expect(render.calls).toBeLessThan(120);
+});
+
+test('?quality= selects the tier and is remembered', async ({ page }) => {
+  await page.goto('./?debug&quality=low');
+  expect((await page.evaluate(snapshot)).quality).toBe('low');
+  await page.goto('./?debug');
+  expect((await page.evaluate(snapshot)).quality).toBe('low');
+  await page.goto('./?debug&quality=high');
+  expect((await page.evaluate(snapshot)).quality).toBe('high');
+});

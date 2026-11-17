@@ -200,6 +200,7 @@ export const RAGDOLL = {
 
 export const STORAGE_KEYS = {
   best: 'funbunrun-best',
+  quality: 'funbunrun-quality',
 } as const;
 
 export const SNIFF = {

@@ -11,7 +11,8 @@ import { detectTouch, TouchControls } from './input/touch';
 import { loadBest, localStore, saveBest } from './platform/storage';
 import { followCamera, menuCamera } from './render/camera';
 import { Hearts, TrailView, updateSniffAtmosphere } from './render/fx';
-import { disposeProps, makeProps } from './render/models';
+import { disposeProps, makeProps, setBlobShadows } from './render/models';
+import { resolveQuality } from './render/quality';
 import { configureColorPipeline, createScene } from './render/scene';
 import { BonesView, BunnyView, DogView, PersonView } from './render/views';
 import { Game } from './sim/game';
@@ -26,7 +27,12 @@ const isTouch = detectTouch();
 const store = localStore();
 // Cosmetic randomness (grass speckles, heart bursts) stays separate from the sim stream.
 const fxRng = mathRandomRng();
-const kit = createScene(isTouch, fxRng);
+const quality = resolveQuality(location.search, store, {
+  touch: isTouch,
+  width: innerWidth,
+  height: innerHeight,
+});
+const kit = createScene(quality, fxRng);
 // `?seed=<n>` forces the world seed for every round; otherwise each round draws a random one.
 const forcedSeed = parseSeed(location.search);
 const game = new Game({
@@ -36,7 +42,7 @@ const game = new Game({
 // Fixed-step clock for the whole simulation; rendering interpolates (#3).
 const runner = new SimRunner(game);
 
-let props = makeProps(game.world);
+let props = makeProps(game.world, quality.detail);
 kit.scene.add(props);
 const dogView = new DogView(kit.scene);
 const bunnyView = new BunnyView(kit.scene);
@@ -44,6 +50,9 @@ const bonesView = new BonesView(kit.scene, game.bones.length);
 const personView = new PersonView(kit.scene);
 const trailView = new TrailView(kit.scene, game.scent.drops.length);
 const hearts = new Hearts(kit.scene, fxRng);
+if (!quality.blobShadows) {
+  setBlobShadows(kit.scene, false);
+}
 const sfx = createSfx();
 const hud = new Hud();
 
@@ -76,7 +85,7 @@ function showMenu(summary: Parameters<Menu['show']>[0]): void {
 game.events.on('world', () => {
   kit.scene.remove(props);
   disposeProps(props);
-  props = makeProps(game.world);
+  props = makeProps(game.world, quality.detail);
   kit.scene.add(props);
 });
 game.events.on('start', () => {
@@ -174,5 +183,5 @@ dogView.place(game.dog);
 bonesView.place(game.bones);
 personView.bind(game.rag);
 showMenu(null);
-installDebugHook(game, location.search);
+installDebugHook(game, location.search, kit.renderer, quality.name);
 startLoop(frame, SIM.maxFrameDt);

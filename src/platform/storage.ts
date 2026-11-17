@@ -44,3 +44,12 @@ export function loadBest(store: KeyValueStore): number {
 export function saveBest(store: KeyValueStore, best: number): void {
   store.set(STORAGE_KEYS.best, String(best));
 }
+
+/** Saved quality tier name, or null when none; the render layer validates it. */
+export function loadQuality(store: KeyValueStore): string | null {
+  return store.get(STORAGE_KEYS.quality);
+}
+
+export function saveQuality(store: KeyValueStore, name: string): void {
+  store.set(STORAGE_KEYS.quality, name);
+}
