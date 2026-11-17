@@ -2,7 +2,7 @@
  * Fixed-step accumulator. Feed it variable frame times; it reports how many
  * fixed steps to run. At most `maxSteps` run per frame; if the backlog is
  * still at least one step after that, it is dropped so a slow frame cannot
- * snowball into ever more steps.
+ * snowball into ever more steps (see SIM in config.ts for the policy).
  */
 export class FixedStepper {
   private acc = 0;
@@ -37,6 +37,11 @@ export class FixedStepper {
   /** Unconsumed time, in seconds. */
   get pending(): number {
     return this.acc;
+  }
+
+  /** Fraction of a step owed, 0..1: the render interpolation factor. */
+  get alpha(): number {
+    return Math.min(1, this.acc / this.step);
   }
 }
 
