@@ -18,6 +18,26 @@ export interface HudFrame {
   arrow: number | null;
 }
 
+/** What the sound controls show: the mute button label and whether the unlock hint is up. */
+export interface SoundUi {
+  label: string;
+  pressed: boolean;
+  hint: boolean;
+}
+
+/**
+ * `locked`: the audio context is not running. `tried`: an unlock was
+ * attempted (a round started), so a still-locked context needs a gesture.
+ * Muted players do not need the hint.
+ */
+export function soundUi(locked: boolean, muted: boolean, tried: boolean): SoundUi {
+  return {
+    label: muted ? 'Sound off (M)' : 'Sound on (M)',
+    pressed: muted,
+    hint: locked && !muted && tried,
+  };
+}
+
 export class Hud {
   private readonly cache = new Map<string, string>();
   private readonly hint = $('hint');
@@ -25,6 +45,8 @@ export class Hud {
   private readonly arrowWrap = $('arrowWrap');
   private readonly stamFill = $('stamFill');
   private readonly popEl = $('pop');
+  private readonly muteBtn = $('bMute');
+  private readonly soundHint = $('sndHint');
 
   private setText(id: string, t: string): void {
     if (this.cache.get(id) !== t) {
@@ -44,6 +66,14 @@ export class Hud {
     this.setText('tScore', 'Score ' + f.score);
     this.setText('tLicks', 'Licks ' + f.licks);
     this.stamFill.style.width = (f.stamina * 100).toFixed(0) + '%';
+  }
+
+  setSound(ui: SoundUi): void {
+    this.muteBtn.textContent = ui.pressed ? '\u266A off' : '\u266A on';
+    this.muteBtn.title = ui.label;
+    this.muteBtn.setAttribute('aria-label', ui.label);
+    this.muteBtn.setAttribute('aria-pressed', String(ui.pressed));
+    this.soundHint.style.display = ui.hint ? 'block' : 'none';
   }
 
   pop(text: string, color = '#fff'): void {

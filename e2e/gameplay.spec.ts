@@ -57,3 +57,18 @@ test('keyboard input runs and jumps the dog and the leash holds', async ({ page 
 
   expect(errors).toEqual([]);
 });
+
+test('M toggles mute and the setting survives a reload', async ({ page }) => {
+  await page.goto('./');
+  const mute = page.locator('#bMute');
+  await expect(mute).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press('KeyM');
+  await expect(mute).toHaveAttribute('aria-pressed', 'true');
+  await page.reload();
+  await expect(page.locator('#bMute')).toHaveAttribute('aria-pressed', 'true');
+  // The HUD button is clickable during play (the menu card covers it).
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#overlay')).toBeHidden();
+  await page.locator('#bMute').click();
+  await expect(page.locator('#bMute')).toHaveAttribute('aria-pressed', 'false');
+});

@@ -1,14 +1,14 @@
 import { BUNNY, SIM } from './config';
 import { startLoop } from './core/loop';
 import { mathRandomRng, parseSeed } from './core/rng';
-import { createSfx } from './audio/sfx';
+import { attachAudioUnlock, createSfx } from './audio/sfx';
 import { installDebugHook } from './debug';
 import { Actions, EdgeDetector } from './input/actions';
 import { pollGamepads, readGamepads } from './input/gamepad';
 import { Keyboard } from './input/keyboard';
 import { attachPointer, releasePointer } from './input/pointer';
 import { detectTouch, TouchControls } from './input/touch';
-import { loadBest, localStore, saveBest } from './platform/storage';
+import { loadBest, loadMuted, localStore, saveBest, saveMuted } from './platform/storage';
 import { followCamera, menuCamera } from './render/camera';
 import { Hearts, TrailView, updateSniffAtmosphere } from './render/fx';
 import { disposeProps, makeProps } from './render/models';
@@ -17,7 +17,7 @@ import { BonesView, BunnyView, DogView, PersonView } from './render/views';
 import { Game } from './sim/game';
 import { SimRunner } from './sim/runner';
 import { formatClock } from './sim/rules';
-import { $, Hud } from './ui/hud';
+import { $, Hud, soundUi } from './ui/hud';
 import { Menu } from './ui/menu';
 
 configureColorPipeline();
@@ -44,8 +44,30 @@ const bonesView = new BonesView(kit.scene, game.bones.length);
 const personView = new PersonView(kit.scene);
 const trailView = new TrailView(kit.scene, game.scent.drops.length);
 const hearts = new Hearts(kit.scene, fxRng);
-const sfx = createSfx();
+const sfx = createSfx({ muted: loadMuted(store) });
 const hud = new Hud();
+/** Set once a round has tried to start the audio; from then on a locked context shows the hint. */
+let audioTried = false;
+const refreshSound = (): void => hud.setSound(soundUi(sfx.locked, sfx.muted, audioTried));
+sfx.onChange = refreshSound;
+// Any gesture (pointer, key, tap) creates or resumes the audio context (#8).
+attachAudioUnlock(window, sfx);
+function toggleMute(): void {
+  sfx.muted = !sfx.muted;
+  saveMuted(store, sfx.muted);
+}
+addEventListener('keydown', (e) => {
+  if (e.code === 'KeyM' && !e.repeat) {
+    toggleMute();
+  }
+});
+for (const id of ['bMute', 'sndHint']) {
+  // Keep focus off the HUD buttons, so Space or Enter never presses them by accident.
+  $(id).addEventListener('mousedown', (e) => e.preventDefault());
+}
+$('bMute').addEventListener('click', toggleMute);
+$('sndHint').addEventListener('click', () => sfx.unlock());
+refreshSound();
 
 const actions = new Actions();
 const isPlaying = (): boolean => game.phase === 'play';
@@ -63,7 +85,12 @@ const touch = new TouchControls(
 const menu = new Menu($('overlay'), $('card'), isTouch, () => startGame());
 
 function startGame(): void {
-  sfx.init();
+  // Inside a key, click or tap this unlocks the audio. A gamepad press is not
+  // a user gesture in every browser, so the context may stay suspended; the
+  // hint then asks for a tap once the resume has had a moment to settle.
+  sfx.unlock();
+  audioTried = true;
+  setTimeout(refreshSound, 400);
   game.start();
 }
 
