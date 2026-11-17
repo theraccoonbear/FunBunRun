@@ -139,6 +139,55 @@ describe('Game', () => {
     expect(g.start()).toBe(false);
   });
 
+  it('pause() freezes the whole sim; resume() continues; quit() returns to the menu', () => {
+    const g = newGame();
+    const seen: string[] = [];
+    for (const name of ['pause', 'resume', 'quit'] as const) {
+      g.events.on(name, () => seen.push(name));
+    }
+    expect(g.pause()).toBe(false);
+    g.start();
+    for (let i = 0; i < 30; i++) {
+      g.update(DT, { ...idle, moveY: 1 });
+    }
+    expect(g.pause()).toBe(true);
+    expect(g.phase).toBe('paused');
+    const frozen = {
+      dog: { ...g.dog.pos },
+      bunny: { ...g.bunny.pos },
+      timeLeft: g.session.timeLeft,
+      elapsed: g.session.elapsed,
+    };
+    for (let i = 0; i < 120; i++) {
+      g.update(DT, { ...idle, moveY: 1, jump: true, lick: true });
+    }
+    expect({
+      dog: g.dog.pos,
+      bunny: g.bunny.pos,
+      timeLeft: g.session.timeLeft,
+      elapsed: g.session.elapsed,
+    }).toEqual(frozen);
+    expect(g.resume()).toBe(true);
+    expect(g.resume()).toBe(false);
+    g.update(DT, { ...idle, moveY: 1 });
+    expect(g.session.timeLeft).toBeCloseTo(frozen.timeLeft - DT);
+    g.pause();
+    expect(g.quit()).toBe(true);
+    expect(g.phase).toBe('menu');
+    expect(g.quit()).toBe(false);
+    expect(seen).toEqual(['pause', 'resume', 'pause', 'quit']);
+  });
+
+  it('restarts a fresh round from pause', () => {
+    const g = newGame();
+    g.start();
+    g.update(DT, idle);
+    g.pause();
+    expect(g.start()).toBe(true);
+    expect(g.phase).toBe('play');
+    expect(g.session.timeLeft).toBe(ROUND_SECONDS);
+  });
+
   it('moves the dog and emits jump during play', () => {
     const g = newGame();
     const onJump = vi.fn();

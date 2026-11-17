@@ -19,6 +19,7 @@ Live: <https://theraccoonbear.github.io/FunBunRun/>
 | E / F / mouse click   | Lick                           |
 | Q (hold)              | Sniff, to track the bunny      |
 | Enter                 | Start or restart from the menu |
+| Esc / P               | Pause and resume               |
 
 ### Touch
 
@@ -26,24 +27,28 @@ Live: <https://theraccoonbear.github.io/FunBunRun/>
 - Right side of the screen: drag to swing the camera.
 - LICK glows when the bunny is within reach.
 - JUMP clears logs. Hold SNIFF to track the bunny.
+- The II button (top left) pauses.
 
 ### Gamepad
 
-| Button      | Action                    |
-| ----------- | ------------------------- |
-| Left stick  | Run                       |
-| Right stick | Camera                    |
-| A           | Jump (or start from menu) |
-| Start       | Start from menu           |
-| X / RT      | Lick                      |
-| B / LT      | Sniff                     |
-| LB / L3     | Sprint                    |
+| Button      | Action                      |
+| ----------- | --------------------------- |
+| Left stick  | Run                         |
+| Right stick | Camera                      |
+| A           | Jump (or start from menu)   |
+| Start       | Start from menu, or pause   |
+| D-pad       | Move through the pause menu |
+| X / RT      | Lick                        |
+| B / LT      | Sniff                       |
+| LB / L3     | Sprint                      |
 
 ## Status
 
 The game is written in TypeScript with three.js; see `CLAUDE.md` for the module layout and [issue #1](https://github.com/theraccoonbear/FunBunRun/issues/1) for the port from the original prototype.
 
 The original single-file prototype is still published for side-by-side comparison: <https://theraccoonbear.github.io/FunBunRun/legacy/> (and at `/legacy/` on every PR preview). It will be removed once parity is confirmed.
+
+The round pauses on Esc, P, gamepad Start or the II button, and also when the tab is hidden, the window loses focus, the mouse capture is released or a gamepad disconnects. The pause menu offers Resume, Restart and Quit to menu.
 
 Bugs and ideas: [issues](https://github.com/theraccoonbear/FunBunRun/issues).
 

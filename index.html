@@ -127,7 +127,8 @@
           transform: translateY(-40px);
         }
       }
-      #overlay {
+      #overlay,
+      #pause {
         position: fixed;
         inset: 0;
         display: flex;
@@ -136,7 +137,12 @@
         background: rgba(30, 20, 50, 0.55);
         z-index: 10;
       }
-      #card {
+      #pause {
+        display: none;
+        z-index: 11;
+      }
+      #card,
+      #pauseCard {
         background: #fff8ef;
         color: #3a2a1a;
         border-radius: 18px;
@@ -146,7 +152,8 @@
         text-align: center;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
       }
-      #card h1 {
+      #card h1,
+      #pauseCard h1 {
         margin: 0 0 4px;
         font-size: 36px;
         color: #c2477f;
@@ -164,7 +171,22 @@
         padding: 8px 12px;
         margin: 12px 0;
       }
-      #card button {
+      #pauseCard {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        max-width: 280px;
+      }
+      #pauseCard button {
+        margin: 6px 0;
+      }
+      #pauseCard button:focus-visible,
+      #pauseCard button:focus {
+        outline: 3px solid #ffd34d;
+        outline-offset: 2px;
+      }
+      #card button,
+      #pauseCard button {
         font: inherit;
         font-weight: 800;
         font-size: 20px;
@@ -174,6 +196,22 @@
         border-radius: 12px;
         padding: 12px 28px;
         margin-top: 6px;
+        cursor: pointer;
+      }
+      #bPause {
+        position: absolute;
+        top: 8px;
+        left: 10px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.55);
+        background: rgba(0, 0, 0, 0.25);
+        color: #fff;
+        font: inherit;
+        font-weight: 900;
+        font-size: 16px;
+        pointer-events: auto;
         cursor: pointer;
       }
       #touch {
@@ -260,6 +298,7 @@
       <div id="arrowWrap"><div id="arrow"></div></div>
       <div id="hint">LICK!</div>
       <div id="pop"></div>
+      <button id="bPause" type="button" tabindex="-1" aria-label="Pause">II</button>
     </div>
     <div id="touch"></div>
     <div id="joyBase"><div id="joyKnob"></div></div>
@@ -267,6 +306,7 @@
     <div class="btn" id="bJump">JUMP</div>
     <div class="btn" id="bSniff">SNIFF</div>
     <div id="overlay"><div id="card"></div></div>
+    <div id="pause" role="dialog" aria-label="Paused"><div id="pauseCard"></div></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

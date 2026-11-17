@@ -76,6 +76,19 @@ describe('FrameTimer', () => {
     t += 500;
     expect(timer.tick()).toBe(0.05);
   });
+
+  it('reset() makes the next tick 0, so a pause is not seen as one long frame', () => {
+    let t = 0;
+    const timer = new FrameTimer(0.25, () => t);
+    timer.tick();
+    t += 16;
+    expect(timer.tick()).toBeCloseTo(0.016);
+    timer.reset();
+    t += 60_000;
+    expect(timer.tick()).toBe(0);
+    t += 16;
+    expect(timer.tick()).toBeCloseTo(0.016);
+  });
 });
 
 describe('startLoop', () => {
@@ -91,7 +104,7 @@ describe('startLoop', () => {
     let now = 0;
     vi.spyOn(performance, 'now').mockImplementation(() => now);
     const dts: number[] = [];
-    const stop = startLoop((dt) => dts.push(dt), 0.05);
+    const loop = startLoop((dt) => dts.push(dt), 0.05);
     now = 16;
     queue.shift()?.(now);
     now = 1000;
@@ -99,9 +112,13 @@ describe('startLoop', () => {
     expect(dts[0]).toBe(0);
     expect(dts[1]).toBeCloseTo(0.016);
     expect(dts[2]).toBe(0.05);
-    stop();
+    loop.resetClock();
+    now = 5000;
+    queue.shift()?.(now);
+    expect(dts[3]).toBe(0);
+    loop.stop();
     expect(cancel).toHaveBeenCalled();
     queue.shift()?.(now);
-    expect(dts).toHaveLength(3);
+    expect(dts).toHaveLength(4);
   });
 });

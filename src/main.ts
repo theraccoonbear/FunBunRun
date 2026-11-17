@@ -9,6 +9,7 @@ import { Keyboard } from './input/keyboard';
 import { attachPointer, releasePointer } from './input/pointer';
 import { detectTouch, TouchControls } from './input/touch';
 import { loadBest, localStore, saveBest } from './platform/storage';
+import { attachSuspendTriggers } from './platform/suspend';
 import { followCamera, menuCamera } from './render/camera';
 import { Hearts, TrailView, updateSniffAtmosphere } from './render/fx';
 import { disposeProps, makeProps } from './render/models';
@@ -19,6 +20,7 @@ import { SimRunner } from './sim/runner';
 import { formatClock } from './sim/rules';
 import { $, Hud } from './ui/hud';
 import { Menu } from './ui/menu';
+import { PauseController, PauseMenu } from './ui/pause';
 
 configureColorPipeline();
 
@@ -49,6 +51,7 @@ const hud = new Hud();
 
 const actions = new Actions();
 const isPlaying = (): boolean => game.phase === 'play';
+const isPaused = (): boolean => game.phase === 'paused';
 const touch = new TouchControls(
   {
     layer: $('touch'),
@@ -65,6 +68,53 @@ const menu = new Menu($('overlay'), $('card'), isTouch, () => startGame());
 function startGame(): void {
   sfx.init();
   game.start();
+}
+
+const canvas = kit.renderer.domElement;
+const pause = new PauseController({
+  phase: () => game.phase,
+  pause: () => game.pause(),
+  resume: () => game.resume(),
+  quit: () => game.quit(),
+  restart: startGame,
+  suspendAudio: () => sfx.suspend(),
+  resumeAudio: () => sfx.resume(),
+  resetClock: () => loop.resetClock(),
+  showOverlay: () => {
+    touch.setVisible(false);
+    pauseMenu.show();
+  },
+  hideOverlay: () => {
+    pauseMenu.hide();
+    if (isTouch && isPlaying()) {
+      touch.setVisible(true);
+    }
+  },
+  pointerLocked: () => document.pointerLockElement === canvas,
+  releasePointer,
+  lockPointer: () => {
+    if (isTouch) {
+      return;
+    }
+    try {
+      const r = canvas.requestPointerLock() as unknown as Promise<void> | undefined;
+      r?.catch(() => {});
+    } catch {
+      /* the next click on the canvas captures it */
+    }
+  },
+  now: () => performance.now(),
+});
+const pauseMenu = new PauseMenu($('pause'), $('pauseCard'), (c, gesture) =>
+  pause.choose(c, gesture),
+);
+/** Enter, gamepad A and Start outside play: confirm the pause menu, or start a round. */
+function confirm(gesture: boolean): void {
+  if (isPaused()) {
+    pauseMenu.activate(gesture);
+  } else {
+    startGame();
+  }
 }
 
 function showMenu(summary: Parameters<Menu['show']>[0]): void {
@@ -110,10 +160,27 @@ game.events.on('roundOver', (r) => {
   }
   showMenu(r);
 });
+game.events.on('quit', () => showMenu(null));
 
-const keyboard = new Keyboard(actions, { onStart: startGame, isPlaying });
+const keyboard = new Keyboard(actions, {
+  onStart: () => confirm(true),
+  isPlaying,
+  onPause: (code) => (code === 'Escape' ? pause.escape() : pause.toggle('key', true)),
+});
 keyboard.attach(window);
-attachPointer(kit.renderer.domElement, actions, { isPlaying, isTouch });
+addEventListener('keydown', (e) => {
+  if (pauseMenu.visible && (e.code === 'ArrowUp' || e.code === 'ArrowDown')) {
+    pauseMenu.move(e.code === 'ArrowUp' ? -1 : 1);
+  }
+});
+attachPointer(canvas, actions, { isPlaying, isTouch });
+attachSuspendTriggers(window, document, canvas, (reason, wasLocked) => {
+  pause.pause(reason, wasLocked);
+});
+const pauseBtn = $('bPause');
+// Keep focus off the button, so Space or Enter never presses it by accident.
+pauseBtn.addEventListener('mousedown', (e) => e.preventDefault());
+pauseBtn.addEventListener('click', () => pause.toggle('button', true));
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 const padEdges = new EdgeDetector();
 
@@ -121,9 +188,30 @@ const padEdges = new EdgeDetector();
 function frame(dt: number): void {
   keyboard.apply();
   touch.apply();
-  pollGamepads(readGamepads(), padEdges, actions, { isPlaying, onStart: startGame }, dt);
+  pollGamepads(
+    readGamepads(),
+    padEdges,
+    actions,
+    {
+      isPlaying,
+      isPaused,
+      onStart: () => confirm(false),
+      onPause: () => pause.toggle('gamepad', false),
+      onNav: (dir) => {
+        if (isPaused()) {
+          pauseMenu.move(dir);
+        }
+      },
+    },
+    dt,
+  );
+  if (isPaused()) {
+    // Drop presses made while paused, so nothing fires on resume.
+    actions.take();
+  }
 
-  const wasPlaying = isPlaying();
+  // A paused round keeps its frozen view.
+  const wasPlaying = isPlaying() || isPaused();
   runner.frame(dt, actions);
   const s = game.session;
   const r = runner.render();
@@ -175,4 +263,4 @@ bonesView.place(game.bones);
 personView.bind(game.rag);
 showMenu(null);
 installDebugHook(game, location.search);
-startLoop(frame, SIM.maxFrameDt);
+const loop = startLoop(frame, SIM.maxFrameDt);

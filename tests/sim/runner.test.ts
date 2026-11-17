@@ -352,3 +352,56 @@ describe('world regeneration with the runner', () => {
     expect(r.bunny.z).toBe(game.bunny.pos.z);
   });
 });
+
+describe('pause with the runner (#7)', () => {
+  it('runs no steps and keeps no backlog while paused', () => {
+    const game = new Game({ seed: 5 });
+    const runner = new SimRunner(game);
+    const input = new Actions();
+    game.start();
+    runner.frame(0.5 * H, input);
+    game.pause();
+    const ticks = runner.ticks;
+    const timeLeft = game.session.timeLeft;
+    for (let i = 0; i < 600; i++) {
+      expect(runner.frame(1 / 60, input)).toBe(0);
+    }
+    // A long frame (a suspended tab) is discarded too.
+    expect(runner.frame(SIM.maxFrameDt, input)).toBe(0);
+    expect(runner.ticks).toBe(ticks);
+    expect(game.session.timeLeft).toBe(timeLeft);
+    expect(runner.stepper.pending).toBeLessThan(H);
+  });
+
+  it('resumes without a catch-up burst: one frame of time runs one step', () => {
+    const game = new Game({ seed: 5 });
+    const runner = new SimRunner(game);
+    const input = new Actions();
+    game.start();
+    runner.frame(10 * H + 0.5 * H, input);
+    game.pause();
+    for (let i = 0; i < 300; i++) {
+      runner.frame(1 / 30, input);
+    }
+    game.resume();
+    expect(runner.stepper.pending).toBe(0);
+    const ticks = runner.ticks;
+    const timeLeft = game.session.timeLeft;
+    expect(runner.frame(H, input)).toBe(1);
+    expect(runner.ticks).toBe(ticks + 1);
+    expect(game.session.timeLeft).toBeCloseTo(timeLeft - H);
+  });
+
+  it('keeps the rendered state still while paused', () => {
+    const game = new Game({ seed: 5 });
+    const runner = new SimRunner(game);
+    const input = new Actions();
+    game.start();
+    input.moveY = 1;
+    runner.frame(20 * H + 0.4 * H, input);
+    game.pause();
+    const before = structuredClone(runner.render());
+    runner.frame(0.3, input);
+    expect(runner.render()).toEqual(before);
+  });
+});
