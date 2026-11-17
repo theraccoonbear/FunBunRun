@@ -23,6 +23,12 @@ export default defineConfig(({ command, isPreview }) => ({
       provider: 'v8',
       include: ['src/**/*.ts'],
       reporter: ['text', 'html'],
+      // The pure modules carry the unit tests; render, input wiring and UI are covered by e2e.
+      // Set a little below the achieved coverage so regressions fail CI.
+      thresholds: {
+        'src/sim/**': { lines: 95, statements: 95, functions: 95, branches: 90 },
+        'src/core/**': { lines: 95, statements: 95, functions: 95, branches: 90 },
+      },
     },
   },
 }));
