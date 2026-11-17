@@ -3,5 +3,5 @@ coverage
 playwright-report
 test-results
 package-lock.json
-index.html
+public/legacy
 .claude
