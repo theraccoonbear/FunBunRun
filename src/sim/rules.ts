@@ -14,10 +14,7 @@ export function createReach(): LickReach {
   return { d: 0, dx: 0, dz: 0, ok: false };
 }
 
-/**
- * Whether the bunny is within licking range. The height check never fails at
- * the current jump tuning (#4); it is kept for parity.
- */
+/** Whether the bunny is within licking range. Licks are allowed mid-air (#4). */
 export function lickReach(
   dog: Readonly<Vec3>,
   bunny: Readonly<Vec3>,
@@ -27,7 +24,7 @@ export function lickReach(
   out.dx = bunny.x - dog.x;
   out.dz = bunny.z - dog.z;
   out.d = Math.hypot(out.dx, out.dz);
-  out.ok = out.d < RULES.lickRange && dog.y < RULES.maxActionHeight && bunnyImmunity <= 0;
+  out.ok = out.d < RULES.lickRange && bunnyImmunity <= 0;
   return out;
 }
 
@@ -40,11 +37,9 @@ export function lickPoints(combo: number): number {
   return RULES.pointsPerLick * combo;
 }
 
+/** Whether a bone is within pickup range. Pickups are allowed mid-air (#4). */
 export function canPickBone(dog: Readonly<Vec3>, boneX: number, boneZ: number): boolean {
-  return (
-    Math.hypot(boneX - dog.x, boneZ - dog.z) < RULES.bonePickupRange &&
-    dog.y < RULES.maxActionHeight
-  );
+  return Math.hypot(boneX - dog.x, boneZ - dog.z) < RULES.bonePickupRange;
 }
 
 /** The best score after a round ending with `score`. */
