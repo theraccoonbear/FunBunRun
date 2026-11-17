@@ -36,7 +36,7 @@ export function menuHtml(isTouch: boolean, summary: RoundSummary | null): string
   html +=
     "<div class='ctl'>" +
     (isTouch ? TOUCH_CONTROLS : DESKTOP_CONTROLS) +
-    "</div><p style='font-size:13px'>Golden bones refill stamina. Lick streaks multiply points. The bun tires out if you keep the pressure on.</p>" +
+    "</div><p style='font-size:13px'>Golden bone-uses (BONE-US!) refill stamina. Lick streaks multiply points. The bun tires out if you keep the pressure on.</p>" +
     "<button id='go'>" +
     (summary ? 'Run again' : 'Start running') +
     '</button>';

@@ -25,6 +25,7 @@ export class Hud {
   private readonly arrowWrap = $('arrowWrap');
   private readonly stamFill = $('stamFill');
   private readonly popEl = $('pop');
+  private readonly boneUsePopEl = $('popBoneUse');
 
   private setText(id: string, t: string): void {
     if (this.cache.get(id) !== t) {
@@ -44,6 +45,15 @@ export class Hud {
     this.setText('tScore', 'Score ' + f.score);
     this.setText('tLicks', 'Licks ' + f.licks);
     this.stamFill.style.width = (f.stamina * 100).toFixed(0) + '%';
+  }
+
+  /** The large gold "BONE-US!" pop-up, with the points as smaller secondary text. */
+  popBoneUse(points: number): void {
+    this.setText('buPoints', '+' + points);
+    const el = this.boneUsePopEl;
+    el.classList.remove('go');
+    void el.offsetWidth; // restart the CSS animation
+    el.classList.add('go');
   }
 
   pop(text: string, color = '#fff'): void {

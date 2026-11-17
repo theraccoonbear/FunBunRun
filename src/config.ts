@@ -25,7 +25,7 @@ export const WORLD = {
   bushes: { count: 40, clearance: 2.5, radius: 1.15, height: 1.6 },
   rocks: { count: 20, clearance: 2.5, radius: 1.0, height: 1.4, maxTilt: 3 },
   logs: { count: 18, clearance: 3, radius: 0.35, height: 0.7, halfLength: 2 },
-  bones: { count: 12, clearance: 1.5 },
+  boneUses: { count: 12, clearance: 1.5 },
 } as const;
 
 export const DOG = {
@@ -127,15 +127,15 @@ export const BUNNY = {
 
 export const RULES = {
   lickRange: 2.6,
-  /** Dog must be below this height to lick or collect a bone (see #4). */
+  /** Dog must be below this height to lick or collect a bone-use (see #4). */
   maxActionHeight: 1.3,
   lickDuration: 0.35,
   lickCooldown: 0.45,
   /** Seconds after a lick within which the next lick extends the combo. */
   comboWindow: 8,
   pointsPerLick: 100,
-  bonePickupRange: 1.4,
-  bonePoints: 25,
+  boneUsePickupRange: 1.4,
+  boneUsePoints: 25,
   /** Sentinel for "no lick yet" so the first lick never extends a combo. */
   noLickTime: -99,
 } as const;
@@ -220,10 +220,20 @@ export const FX = {
   heartCount: 14,
   heartGravity: 6,
   heartSpawnHeight: 0.9,
-  boneSpin: 2,
-  boneHeight: 0.6,
-  boneBob: 0.1,
-  boneBobRate: 3,
+  boneUseSpin: 2,
+  boneUseHeight: 0.6,
+  boneUseBob: 0.1,
+  boneUseBobRate: 3,
+} as const;
+
+/** Dog tail wag. A bone-use pickup speeds it up for a short burst. */
+export const TAIL = {
+  /** Wag rate in radians per second. */
+  baseRate: 14,
+  /** Seconds the wag stays sped up after a bone-use pickup. */
+  burstSeconds: 1,
+  /** Wag rate multiplier while the burst lasts. */
+  burstMultiplier: 3,
 } as const;
 
 export const YANK_MESSAGES = ['Yoink!', 'Whoa!', 'Not again!', 'Slow down!'] as const;

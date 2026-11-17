@@ -1,4 +1,4 @@
-import { FX, LEASH_LENGTH, RAGDOLL, RULES, WORLD, YANK_MESSAGES } from '../config';
+import { FX, LEASH_LENGTH, RAGDOLL, RULES, TAIL, WORLD, YANK_MESSAGES } from '../config';
 import { Emitter } from '../core/events';
 import { FixedStepper } from '../core/loop';
 import type { Vec3 } from '../core/math';
@@ -23,7 +23,7 @@ import {
 } from './game-state';
 import { createLook, resetLook, type Basis, type LookState } from './look';
 import { makeRagdollSim, type Particle, type Ragdoll } from './ragdoll';
-import { canPickBone, createReach, lickReach, type LickReach } from './rules';
+import { canPickBoneUse, createReach, lickReach, tickWagBurst, type LickReach } from './rules';
 import { ageScent, clearScentTrail, createScentTrail, dropScent, type ScentTrail } from './scent';
 import { freeSpot, generateWorld, type World } from './world';
 
@@ -48,12 +48,12 @@ export interface GameEvents extends Record<string, unknown> {
   jump: undefined;
   lick: { points: number; combo: number; x: number; z: number };
   miss: undefined;
-  bone: { points: number };
+  boneUse: { points: number };
   yank: { message: string };
   roundOver: RoundResult & { dragged: number };
 }
 
-export interface Bone {
+export interface BoneUse {
   x: number;
   z: number;
   /** Spin angle; advances only during play. */
@@ -66,7 +66,7 @@ export interface GameOptions {
 }
 
 /**
- * The whole simulation: world, dog, bunny, person on the leash, bones and
+ * The whole simulation: world, dog, bunny, person on the leash, bone-uses and
  * round rules. No three.js and no DOM; adapters read its state and
  * subscribe to `events`.
  */
@@ -78,7 +78,7 @@ export class Game {
   readonly dog: DogState = createDog();
   readonly look: LookState = createLook();
   readonly bunny: BunnyState = createBunny();
-  readonly bones: Bone[] = [];
+  readonly boneUses: BoneUse[] = [];
   readonly scent: ScentTrail = createScentTrail();
   readonly reach: LickReach = createReach();
   /** Camera-relative basis used for movement this frame. */
@@ -87,6 +87,8 @@ export class Game {
   readonly collar: Vec3 = { x: 0, y: 0, z: 0 };
   rag: Ragdoll;
   sprinting = false;
+  /** Seconds left of the tail-wag burst triggered by a bone-use pickup. */
+  wagBurstT = 0;
   /** Lick timer as it was when the dog moved this frame (drives the head and tongue pose). */
   dogLickT = 0;
   /** Fixed-step clock for the person and leash physics. */
@@ -98,9 +100,9 @@ export class Game {
     this.rng = opts.rng ?? mathRandomRng();
     this.session = createSession(opts.best ?? 0);
     this.world = generateWorld(this.rng);
-    for (let i = 0; i < WORLD.bones.count; i++) {
-      const { x, z } = freeSpot(this.world.obstacles, WORLD.bones.clearance, this.rng);
-      this.bones.push({ x, z, spin: 0 });
+    for (let i = 0; i < WORLD.boneUses.count; i++) {
+      const { x, z } = freeSpot(this.world.obstacles, WORLD.boneUses.clearance, this.rng);
+      this.boneUses.push({ x, z, spin: 0 });
     }
     this.rag = this.buildPerson();
   }
@@ -114,6 +116,7 @@ export class Game {
     if (!startRound(this.session)) {
       return false;
     }
+    this.wagBurstT = 0;
     resetDog(this.dog);
     resetLook(this.look);
     resetBunny(this.bunny);
@@ -200,15 +203,17 @@ export class Game {
       this.events.emit('yank', { message: this.rng.pick(YANK_MESSAGES) });
     }
 
-    for (const bone of this.bones) {
-      bone.spin += dt * FX.boneSpin;
-      if (canPickBone(d.pos, bone.x, bone.z)) {
+    this.wagBurstT = tickWagBurst(this.wagBurstT, dt);
+    for (const boneUse of this.boneUses) {
+      boneUse.spin += dt * FX.boneUseSpin;
+      if (canPickBoneUse(d.pos, boneUse.x, boneUse.z)) {
         d.stam = 1;
-        s.score += RULES.bonePoints;
-        this.events.emit('bone', { points: RULES.bonePoints });
-        const spot = freeSpot(this.world.obstacles, WORLD.bones.clearance, this.rng);
-        bone.x = spot.x;
-        bone.z = spot.z;
+        s.score += RULES.boneUsePoints;
+        this.wagBurstT = TAIL.burstSeconds;
+        this.events.emit('boneUse', { points: RULES.boneUsePoints });
+        const spot = freeSpot(this.world.obstacles, WORLD.boneUses.clearance, this.rng);
+        boneUse.x = spot.x;
+        boneUse.z = spot.z;
       }
     }
 

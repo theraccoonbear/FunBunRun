@@ -162,10 +162,10 @@ export function makeDog(): DogModel {
   return { root, body, head, ears, tonguePivot, tail, legs };
 }
 
-export const boneMaterial = (): THREE.MeshLambertMaterial =>
+export const boneUseMaterial = (): THREE.MeshLambertMaterial =>
   new THREE.MeshLambertMaterial({ color: 0xffd34d, emissive: 0x443300 });
 
-export function makeBone(mat: THREE.Material): THREE.Group {
+export function makeBoneUse(mat: THREE.Material): THREE.Group {
   const g = new THREE.Group();
   const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6, 8), mat);
   shaft.rotation.z = Math.PI / 2;

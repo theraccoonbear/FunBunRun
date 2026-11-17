@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { RULES } from '../../src/config';
+import { RULES, TAIL } from '../../src/config';
 import {
-  canPickBone,
+  canPickBoneUse,
   createReach,
   formatClock,
   lickPoints,
   lickReach,
   nextCombo,
   showsNewBest,
+  tailWagMultiplier,
+  tickWagBurst,
   updatedBest,
 } from '../../src/sim/rules';
 
@@ -50,11 +52,25 @@ describe('combo and scoring', () => {
   });
 });
 
-describe('bones', () => {
+describe('bone-uses', () => {
   it('are picked up within 1.4 m on the ground', () => {
-    expect(canPickBone(dog, 1, 0.9)).toBe(true);
-    expect(canPickBone(dog, 1.4, 0)).toBe(false);
-    expect(canPickBone({ x: 0, y: 1.3, z: 0 }, 0, 0)).toBe(false);
+    expect(canPickBoneUse(dog, 1, 0.9)).toBe(true);
+    expect(canPickBoneUse(dog, 1.4, 0)).toBe(false);
+    expect(canPickBoneUse({ x: 0, y: 1.3, z: 0 }, 0, 0)).toBe(false);
+  });
+});
+
+describe('tail wag burst', () => {
+  it('multiplies the wag rate only while the burst lasts', () => {
+    expect(tailWagMultiplier(0)).toBe(1);
+    expect(tailWagMultiplier(0.01)).toBe(TAIL.burstMultiplier);
+    expect(TAIL.burstMultiplier).toBeGreaterThan(1);
+  });
+
+  it('counts down to zero and never below', () => {
+    expect(tickWagBurst(1, 0.25)).toBeCloseTo(0.75);
+    expect(tickWagBurst(0.1, 0.5)).toBe(0);
+    expect(tickWagBurst(0, 0.5)).toBe(0);
   });
 });
 
