@@ -14,8 +14,8 @@ Browser game: a dog chases a bunny through a 3D park to lick it, with a person d
 
 ## Branches and PRs
 
-- Always branch from an up-to-date `main`. Prefixes: `feature/`, `fix/`, `chore/`, `ci/`, `docs/`, `perf/`.
-- Squash merges. Commit and PR titles use conventional-commit subjects (`feat:`, `fix:`, `chore:`, `ci:`, `docs:`, `perf:`, `test:`, `build:`).
+- Branch from `main`. Prefixes: `feature/`, `fix/`, `chore/`, `ci/`, `docs/`, `perf/`.
+- Squash-only merges. Branches do not need to be up to date with `main` before merging. Enable auto-merge with `gh pr merge N --auto --squash`. Commit and PR titles use conventional-commit subjects (`feat:`, `fix:`, `chore:`, `ci:`, `docs:`, `perf:`, `test:`, `build:`).
 - Every PR links an issue (`Closes #N`).
 - Do not lint or reformat `public/legacy/index.html`; it is excluded from ESLint and Prettier.
 
@@ -26,19 +26,20 @@ Merging PRs, pushing to `main`, tags/releases and repository settings need an ex
 ## Architecture direction
 
 - `src/config.ts`: every tuning constant, named and commented. Changing a value changes game feel.
-- `src/core/`: `math` (plain `Vec2`/`Vec3`, segment maths), `events` (typed emitter), `loop` (fixed-step accumulator, frame timer, rAF loop), `rng` (`Rng` interface, seeded `createRng`, `mathRandomRng`).
-- `src/sim/`: pure TypeScript, no three.js and no DOM, so it is unit-testable and portable across engines. `world` (prop placement, obstacles), `collision`, `look` (camera yaw/pitch), `dog`, `bunny`, `scent`, `ragdoll` (person and leash, Verlet), `rules`, `game-state` (phases menu/play/over, clock, score), and `game` (the `Game` class that composes them and emits typed events). Randomness comes from an injected `Rng`; the game currently passes `mathRandomRng()` to match the prototype, and #11 switches world generation to a seeded stream.
-- `src/input/`: devices write into `Actions` (axes, held buttons, edge-latched jump/lick cleared at frame end). `keyboard`, `pointer`, `touch`, `gamepad`; `joystick` is the pure virtual-stick maths.
+- `src/core/`: `math` (plain `Vec2`/`Vec3`, segment maths, lerp, frame-rate independent smoothing), `events` (typed emitter), `loop` (fixed-step accumulator with interpolation alpha, frame timer, rAF loop), `rng` (`Rng` interface, seeded `createRng`, `mathRandomRng`).
+- `src/sim/`: pure TypeScript, no three.js and no DOM, so it is unit-testable and portable across engines. `world` (prop placement, obstacles), `collision`, `look` (camera yaw/pitch), `dog`, `bunny`, `scent`, `ragdoll` (person and leash, Verlet), `rules`, `game-state` (phases menu/play/over, clock, score), `game` (the `Game` class that composes them and emits typed events; `update(dt, input)` is one sim step), `runner` (`SimRunner`: fixed-step driver and render interpolation) and `interp` (the plain `RenderState` snapshot and its blending). Randomness comes from an injected `Rng`; the game currently passes `mathRandomRng()` to match the prototype, and #11 switches world generation to a seeded stream.
+- `src/input/`: devices write into `Actions` (axes, held buttons, look deltas and edge-latched jump/lick that stay latched until a sim step takes them, so a press is applied exactly once). `keyboard`, `pointer`, `touch`, `gamepad`; `joystick` is the pure virtual-stick maths.
 - `src/render/`: three.js only here. `scene` (renderer, lights, ground, colour pipeline), `models`, `views` (sync sim state to meshes plus procedural animation), `camera`, `fx` (scent trail, hearts, sniff atmosphere). Colour management is off and output is linear to match the r128 look; light intensities carry a factor of PI for the same reason.
 - `src/audio/sfx.ts`, `src/ui/` (`hud`, `menu`), `src/platform/storage.ts` (key-value store; best score under `funbunrun-best`).
-- `src/main.ts` wires everything in the prototype's per-frame order; `src/debug.ts` exposes a read-only `window.__fbr.snapshot()` when the URL has `?debug` (used by the e2e tests).
+- Timing (#3): the whole simulation runs in fixed steps of `SIM.step` (60 Hz) through `SimRunner`, at most `SIM.maxStepsPerFrame` per frame; excess time is dropped, so the game only slows below 15 fps. Same seed and same per-step input give the same state at any frame rate (`tests/sim/runner.test.ts`). Views draw `runner.render()`, blended between the last two steps. Per-frame code must not change sim state; visual-only effects (hearts, sniff atmosphere, FOV) run per frame, with 60 Hz-tuned smoothing converted via `smoothing()`.
+- `src/main.ts` wires everything per frame (input, `runner.frame`, views); `src/debug.ts` exposes a read-only `window.__fbr.snapshot()` when the URL has `?debug` (used by the e2e tests).
 - Coverage thresholds apply to `src/sim/**` and `src/core/**` (`npm run test:coverage`, run in CI).
 - three.js is the renderer for now. The engine decision for consoles is revisited once the gameplay loop is proven.
 - Port strategy: keep existing behaviour. During the port, fix only bugs whose fix does not change game feel. Feel-changing fixes go in separate PRs so they can be judged on their own.
 
 ## Deployment
 
-- Production: https://theraccoonbear.github.io/FunBunRun/ (gh-pages root, published on push to `main`)
+- Production: https://theraccoonbear.github.io/FunBunRun/ (gh-pages root). Deploys run only after CI is green on `main` (`deploy-pages.yml` is triggered by the CI run), so a red `main` is never published. If `main` goes red after a merge, fix forward or revert promptly.
 - PR previews: https://theraccoonbear.github.io/FunBunRun/pr-N/ (published per PR, removed on close)
 - Pages source must be "Deploy from a branch" (gh-pages, /root). Publishing goes through `.github/scripts/publish-gh-pages.sh`.
 - URL paths are case-sensitive: the base is `/FunBunRun/`.

@@ -23,6 +23,23 @@ export function wrapAngle(a: number): number {
   return a;
 }
 
+export const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
+
+/** Interpolates between two angles along the shorter arc. */
+export function lerpAngle(a: number, b: number, t: number): number {
+  return a + wrapAngle(b - a) * t;
+}
+
+/**
+ * Frame-rate independent form of the smoothing factor `min(1, dt * rate)`
+ * tuned at a fixed `step`: applying it over `dt` matches applying the tuned
+ * factor once per `step`, and equals it exactly when `dt === step`.
+ */
+export function smoothing(rate: number, dt: number, step: number): number {
+  const perStep = Math.min(1, step * rate);
+  return 1 - Math.pow(1 - perStep, dt / step);
+}
+
 /** A line segment on the ground plane from (ax, az) to (bx, bz). A circle has a == b. */
 export interface Segment {
   ax: number;

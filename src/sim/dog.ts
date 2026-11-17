@@ -9,7 +9,7 @@ export interface DogPose {
   x: number;
   y: number;
   z: number;
-  /** Heading the model faces this frame. */
+  /** Heading the model faces after the last step. */
   heading: number;
   /** Height of the body pivot above the root. */
   bodyY: number;
@@ -88,8 +88,8 @@ export function placeDog(d: DogState): void {
 }
 
 /**
- * One frame of dog movement, camera look and gait. `basis` receives the
- * camera-relative movement basis used this frame (before auto-follow).
+ * One sim step of dog movement, camera look and gait. `basis` receives the
+ * camera-relative movement basis used in this step (before auto-follow).
  */
 export function updateDog(
   d: DogState,

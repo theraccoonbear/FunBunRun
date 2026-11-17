@@ -5,18 +5,27 @@ name: Deploy Pages
 # preserved on root publishes. Repo Settings -> Pages -> Source must be
 # "Deploy from a branch" (gh-pages, /root), not "GitHub Actions".
 #
-# Tests are not re-run here; CI (ci.yml) gates PRs into main.
+# The deploy runs only after CI (ci.yml) has completed successfully on a push
+# to main, so a red main is never published. This is also why PR branches do
+# not need to be up to date with main before merging: the merged result is
+# tested by CI on main, and production only follows when that run is green.
+# If a newer commit has landed on main by the time this runs, the deploy is
+# skipped (.github/scripts/is-main-tip.sh); the newer commit's own CI and
+# deploy follow. Note that workflow_run triggers only take effect from the
+# default branch.
 on:
-  push:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
     branches: [main]
   workflow_dispatch: {}
 
-# Runs on main are never cancelled; they queue per ref so the newest main
-# push is the one that ends up published. Concurrent pushes to gh-pages from
-# other workflows are handled by the retried push in
+# Deploys are never cancelled; they queue in a single group so the newest
+# main commit is the one that ends up published. Concurrent pushes to
+# gh-pages from other workflows are handled by the retried push in
 # .github/scripts/publish-gh-pages.sh.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}
   cancel-in-progress: false
 
 permissions:
@@ -24,17 +33,33 @@ permissions:
 
 jobs:
   build-deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
+    env:
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Skip if a newer commit is on main
+        id: guard
+        if: github.event_name != 'workflow_dispatch'
+        run: .github/scripts/is-main-tip.sh "$DEPLOY_SHA"
+      - if: steps.guard.outputs.publish != 'false'
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
-      - run: npm run build
+      - if: steps.guard.outputs.publish != 'false'
+        run: npm ci
+      - if: steps.guard.outputs.publish != 'false'
+        run: npm run build
       - name: Publish to gh-pages root
+        if: steps.guard.outputs.publish != 'false'
         run: |
-          .github/scripts/publish-gh-pages.sh publish dist . "deploy: ${GITHUB_SHA}"
+          .github/scripts/publish-gh-pages.sh publish dist . "deploy: ${DEPLOY_SHA}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,4 +1,4 @@
-import { BUNNY, MAX_FRAME_DT } from './config';
+import { BUNNY, SIM } from './config';
 import { startLoop } from './core/loop';
 import { mathRandomRng, parseSeed } from './core/rng';
 import { createSfx } from './audio/sfx';
@@ -15,6 +15,7 @@ import { disposeProps, makeProps } from './render/models';
 import { configureColorPipeline, createScene } from './render/scene';
 import { BonesView, BunnyView, DogView, PersonView } from './render/views';
 import { Game } from './sim/game';
+import { SimRunner } from './sim/runner';
 import { formatClock } from './sim/rules';
 import { $, Hud } from './ui/hud';
 import { Menu } from './ui/menu';
@@ -32,6 +33,8 @@ const game = new Game({
   best: loadBest(store),
   ...(forcedSeed === null ? {} : { seed: forcedSeed }),
 });
+// Fixed-step clock for the whole simulation; rendering interpolates (#3).
+const runner = new SimRunner(game);
 
 let props = makeProps(game.world);
 kit.scene.add(props);
@@ -114,31 +117,35 @@ attachPointer(kit.renderer.domElement, actions, { isPlaying, isTouch });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 const padEdges = new EdgeDetector();
 
+/** One rendered frame: sample input, run the sim steps due, draw the interpolated state. */
 function frame(dt: number): void {
   keyboard.apply();
   touch.apply();
   pollGamepads(readGamepads(), padEdges, actions, { isPlaying, onStart: startGame }, dt);
 
   const wasPlaying = isPlaying();
-  game.update(dt, actions);
+  runner.frame(dt, actions);
   const s = game.session;
+  const r = runner.render();
 
   if (wasPlaying) {
-    dogView.sync(game.dog, s.elapsed, game.dogLickT);
-    followCamera(kit.camera, game.dog.pos, game.look, game.basis, game.sprinting, dt);
-    bunnyView.sync(game.bunny);
-    personView.sync();
-    bonesView.sync(game.bones, s.elapsed);
+    dogView.sync(r.dog, r.elapsed);
+    followCamera(kit.camera, r.dog, r.camYaw, r.camPitch, game.sprinting, dt);
+    bunnyView.sync(r.bunny);
+    personView.sync(r.pts);
+    bonesView.sync(game.bones, r.boneSpin, r.elapsed);
 
     const sniffing = actions.sniff;
     updateSniffAtmosphere(kit, sniffing, dt);
     trailView.sync(game.scent, sniffing);
     let arrow: number | null = null;
     if (sniffing) {
-      const dx = game.bunny.pos.x - game.dog.pos.x;
-      const dz = game.bunny.pos.z - game.dog.pos.z;
-      const b = game.basis;
-      arrow = Math.atan2(dx * b.rx + dz * b.rz, dx * b.fx + dz * b.fz);
+      const dx = r.bunny.x - r.dog.x;
+      const dz = r.bunny.z - r.dog.z;
+      // Screen-relative: forward and right of the rendered camera yaw.
+      const sy = Math.sin(r.camYaw);
+      const cy = Math.cos(r.camYaw);
+      arrow = Math.atan2(dx * cy - dz * sy, -dx * sy - dz * cy);
     }
     hud.update({
       clock: formatClock(s.timeLeft),
@@ -149,15 +156,15 @@ function frame(dt: number): void {
       arrow,
     });
   } else {
-    menuCamera(kit.camera, s.elapsed);
-    bunnyView.syncMenu(game.bunny, s.elapsed, BUNNY.start.x, BUNNY.start.z);
+    menuCamera(kit.camera, r.elapsed);
+    bunnyView.syncMenu(r.bunny.hopT, r.elapsed, BUNNY.start.x, BUNNY.start.z);
     if (game.phase === 'over') {
-      personView.sync();
+      personView.sync(r.pts);
     }
   }
 
+  // Visual-only effects stay per frame.
   hearts.update(dt);
-  actions.endFrame();
   kit.render();
 }
 
@@ -168,4 +175,4 @@ bonesView.place(game.bones);
 personView.bind(game.rag);
 showMenu(null);
 installDebugHook(game, location.search);
-startLoop(frame, MAX_FRAME_DT);
+startLoop(frame, SIM.maxFrameDt);

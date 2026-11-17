@@ -1,14 +1,17 @@
 import type * as THREE from 'three';
-import { BUNNY, CAMERA } from '../config';
-import type { Vec3 } from '../core/math';
-import type { Basis, LookState } from '../sim/look';
+import { BUNNY, CAMERA, SIM } from '../config';
+import { smoothing, type Vec3 } from '../core/math';
 
-/** Third-person orbit behind the dog; widens the FOV while sprinting. */
+/**
+ * Third-person orbit behind the dog; widens the FOV while sprinting. The
+ * target, yaw and pitch are the interpolated sim values; the FOV eases per
+ * rendered frame with the 60 Hz-tuned rate made frame-rate independent.
+ */
 export function followCamera(
   camera: THREE.PerspectiveCamera,
   dog: Readonly<Vec3>,
-  look: Readonly<LookState>,
-  basis: Readonly<Basis>,
+  yaw: number,
+  pitch: number,
   sprinting: boolean,
   dt: number,
 ): void {
@@ -16,14 +19,17 @@ export function followCamera(
   const ty = dog.y + CAMERA.targetHeight;
   const tz = dog.z;
   const dist = CAMERA.distance;
+  // Forward on the ground plane, as in basisFromYaw().
+  const fx = -Math.sin(yaw);
+  const fz = -Math.cos(yaw);
   camera.position.set(
-    tx - basis.fx * Math.cos(look.pitch) * dist,
-    ty + Math.sin(look.pitch) * dist,
-    tz - basis.fz * Math.cos(look.pitch) * dist,
+    tx - fx * Math.cos(pitch) * dist,
+    ty + Math.sin(pitch) * dist,
+    tz - fz * Math.cos(pitch) * dist,
   );
   camera.lookAt(tx, ty, tz);
   const fovT = sprinting ? CAMERA.sprintFov : CAMERA.fov;
-  camera.fov += (fovT - camera.fov) * Math.min(1, dt * CAMERA.fovRate);
+  camera.fov += (fovT - camera.fov) * smoothing(CAMERA.fovRate, dt, SIM.step);
   camera.updateProjectionMatrix();
 }
 

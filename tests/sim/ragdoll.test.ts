@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { RAGDOLL } from '../../src/config';
+import { RAGDOLL, SIM } from '../../src/config';
 import { makeRagdollSim, type Particle } from '../../src/sim/ragdoll';
 
 const L = 3.6;
-const H = RAGDOLL.step;
+const H = SIM.step;
 const noCollide = (): void => {};
 const collar = { x: 0, y: 0.9, z: 0 };
 

@@ -89,7 +89,7 @@ export function tickClock(s: Session, dt: number): RoundResult | null {
     score: s.score,
     licks: s.licks,
     best: s.best,
-    newBest: showsNewBest(s.score, s.best),
+    newBest: showsNewBest(s.score, prev),
     bestChanged: s.best !== prev,
   };
 }
