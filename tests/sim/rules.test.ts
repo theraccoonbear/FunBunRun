@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RULES } from '../../src/config';
+import { DOG, RULES } from '../../src/config';
 import {
   canPickBone,
   createReach,
@@ -26,12 +26,10 @@ describe('lickReach', () => {
     expect(lickReach(dog, { x: 1, y: 0, z: 0 }, 0, createReach()).ok).toBe(true);
   });
 
-  it('requires the dog below the action height', () => {
-    expect(lickReach({ x: 0, y: 1.29, z: 0 }, { x: 1, y: 0, z: 0 }, 0, createReach()).ok).toBe(
+  it('succeeds with the dog at peak jump height (#4)', () => {
+    const peak = (DOG.jumpVelocity * DOG.jumpVelocity) / (2 * DOG.gravity);
+    expect(lickReach({ x: 0, y: peak, z: 0 }, { x: 1, y: 0, z: 0 }, 0, createReach()).ok).toBe(
       true,
-    );
-    expect(lickReach({ x: 0, y: 1.3, z: 0 }, { x: 1, y: 0, z: 0 }, 0, createReach()).ok).toBe(
-      false,
     );
   });
 });
@@ -51,10 +49,14 @@ describe('combo and scoring', () => {
 });
 
 describe('bones', () => {
-  it('are picked up within 1.4 m on the ground', () => {
+  it('are picked up within 1.4 m', () => {
     expect(canPickBone(dog, 1, 0.9)).toBe(true);
     expect(canPickBone(dog, 1.4, 0)).toBe(false);
-    expect(canPickBone({ x: 0, y: 1.3, z: 0 }, 0, 0)).toBe(false);
+  });
+
+  it('are picked up with the dog at peak jump height (#4)', () => {
+    const peak = (DOG.jumpVelocity * DOG.jumpVelocity) / (2 * DOG.gravity);
+    expect(canPickBone({ x: 0, y: peak, z: 0 }, 1, 0)).toBe(true);
   });
 });
 

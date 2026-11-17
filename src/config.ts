@@ -127,8 +127,6 @@ export const BUNNY = {
 
 export const RULES = {
   lickRange: 2.6,
-  /** Dog must be below this height to lick or collect a bone (see #4). */
-  maxActionHeight: 1.3,
   lickDuration: 0.35,
   lickCooldown: 0.45,
   /** Seconds after a lick within which the next lick extends the combo. */
