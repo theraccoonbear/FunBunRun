@@ -53,11 +53,12 @@ export function updatedBest(score: number, best: number): number {
 }
 
 /**
- * Whether the round-over card says "New best!". Evaluated after the best has
- * been updated, so a tie also qualifies (#5); kept for parity.
+ * Whether the round-over card says "New best!": the score must strictly beat
+ * the best from before the round. A first-ever positive score qualifies
+ * because the previous best is 0; a tie or a zero score does not (#5).
  */
-export function showsNewBest(score: number, bestAfterUpdate: number): boolean {
-  return score >= bestAfterUpdate && score > 0;
+export function showsNewBest(score: number, previousBest: number): boolean {
+  return score > previousBest && score > 0;
 }
 
 /** HUD clock text, rounding up to whole seconds: 90 -> "1:30". */

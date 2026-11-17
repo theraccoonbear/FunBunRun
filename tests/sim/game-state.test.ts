@@ -57,6 +57,17 @@ describe('session', () => {
     });
   });
 
+  it('does not flag a new best when the round only ties the best', () => {
+    const s = createSession(300);
+    startRound(s);
+    s.score = 300;
+    expect(tickClock(s, ROUND_SECONDS)).toMatchObject({
+      best: 300,
+      newBest: false,
+      bestChanged: false,
+    });
+  });
+
   it('over -> play starts a fresh round', () => {
     const s = createSession(0);
     startRound(s);
