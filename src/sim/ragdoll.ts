@@ -58,9 +58,9 @@ export interface RagdollStatus {
   /** Metres the person has been dragged while down. */
   dragged: number;
   /** Set when a yank knocks the person down; the game clears it. */
-  yanked?: boolean;
-  /** Collar position at the previous step. */
-  lc?: Vec2;
+  yanked: boolean;
+  /** Collar position at the previous step; null before the first step. */
+  lc: Vec2 | null;
 }
 
 export interface Ragdoll {
@@ -153,6 +153,8 @@ export function makeRagdollSim(opts: RagdollOptions): Ragdoll {
     walkPh: 0,
     swing: 0,
     dragged: 0,
+    yanked: false,
+    lc: null,
   };
 
   function solve(c: Constraint): void {
@@ -318,7 +320,12 @@ export function makeRagdollSim(opts: RagdollOptions): Ragdoll {
     st.tension = Math.min(1, pull * RAGDOLL.tensionScale);
     // Only a moving dog knocks the human over; slack-taking while they get up does not
     const cs = st.lc ? Math.hypot(collar.x - st.lc.x, collar.z - st.lc.z) / h : 0;
-    st.lc = { x: collar.x, z: collar.z };
+    if (st.lc) {
+      st.lc.x = collar.x;
+      st.lc.z = collar.z;
+    } else {
+      st.lc = { x: collar.x, z: collar.z };
+    }
     if (pull > RAGDOLL.stunPull && cs > RAGDOLL.yankCollarSpeed) {
       st.stun = Math.max(st.stun, RAGDOLL.stunTime);
     }

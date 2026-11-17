@@ -63,6 +63,25 @@ describe('makeRagdollSim', () => {
     }
   });
 
+  it('declares every status field up front, so the object shape never changes', () => {
+    const r = make();
+    const keys = Object.keys(r.st).sort();
+    expect(keys).toEqual(
+      ['dragged', 'lc', 'stun', 'swing', 'tension', 'walkPh', 'yank', 'yanked'].sort(),
+    );
+    expect(r.st.yanked).toBe(false);
+    expect(r.st.lc).toBeNull();
+    const c = { ...collar };
+    r.step(H, c, noCollide);
+    const lc = r.st.lc;
+    c.x += 0.1;
+    r.step(H, c, noCollide);
+    expect(Object.keys(r.st).sort()).toEqual(keys);
+    // The previous-collar record is reused, not reallocated per step.
+    expect(r.st.lc).toBe(lc);
+    expect(r.st.lc).toEqual({ x: c.x, z: c.z });
+  });
+
   it('pins rope[0] to the collar', () => {
     const r = make();
     const c = { x: 5, y: 1, z: -2 };
