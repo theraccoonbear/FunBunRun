@@ -1,13 +1,13 @@
 import * as THREE from 'three';
-import { FX, RAGDOLL, RULES } from '../config';
+import { FX, RAGDOLL, RULES, TAIL } from '../config';
 import type { BunnyState } from '../sim/bunny';
 import type { DogState } from '../sim/dog';
-import type { Bone } from '../sim/game';
+import type { BoneUse } from '../sim/game';
 import type { BodyPart, Particle, Ragdoll } from '../sim/ragdoll';
 import {
   blobShadow,
-  boneMaterial,
-  makeBone,
+  boneUseMaterial,
+  makeBoneUse,
   makeBunny,
   makeDog,
   type BunnyModel,
@@ -28,8 +28,15 @@ export class DogView {
     this.model.root.rotation.y = d.pose.heading;
   }
 
-  /** `lickT` is the lick timer as it was when the dog moved this frame. */
-  sync(d: DogState, elapsed: number, lickT: number): void {
+  /** Accumulated wag phase, so a rate change speeds the wag up without a jump. */
+  private wagPhase = 0;
+  private lastElapsed = 0;
+
+  /**
+   * `lickT` is the lick timer as it was when the dog moved this frame;
+   * `wagMul` scales the tail wag rate (1 normally, higher after a bone-use).
+   */
+  sync(d: DogState, elapsed: number, lickT: number, wagMul = 1): void {
     const m = this.model;
     const p = d.pose;
     const amp = p.amp;
@@ -46,7 +53,10 @@ export class DogView {
       l2.rotation.x = Math.sin(d.ph + 2.4) * 0.9 * amp;
       l3.rotation.x = Math.sin(d.ph + 2.8) * 0.9 * amp;
     }
-    m.tail.rotation.y = Math.sin(elapsed * 14) * 0.6;
+    const wagDt = Math.max(0, Math.min(elapsed - this.lastElapsed, 0.1));
+    this.lastElapsed = elapsed;
+    this.wagPhase += wagDt * TAIL.baseRate * wagMul;
+    m.tail.rotation.y = Math.sin(this.wagPhase) * 0.6;
     const ear = -Math.abs(Math.sin(d.ph)) * 0.6 * amp - (d.grounded ? 0 : 0.8);
     for (const e of m.ears) {
       e.rotation.x = ear;
@@ -245,26 +255,26 @@ export class PersonView {
   }
 }
 
-/** Golden bones: spin and bob above their sim positions. */
-export class BonesView {
+/** Bone-uses (golden bones): spin and bob above their sim positions. */
+export class BoneUsesView {
   private readonly meshes: THREE.Group[] = [];
 
   constructor(scene: THREE.Scene, count: number) {
-    const mat = boneMaterial();
+    const mat = boneUseMaterial();
     for (let i = 0; i < count; i++) {
-      const g = makeBone(mat);
+      const g = makeBoneUse(mat);
       scene.add(g);
       this.meshes.push(g);
     }
   }
 
   /** Initial placement, before any round has run. */
-  place(bones: readonly Bone[]): void {
-    bones.forEach((b, i) => this.meshes[i]?.position.set(b.x, FX.boneHeight, b.z));
+  place(boneUses: readonly BoneUse[]): void {
+    boneUses.forEach((b, i) => this.meshes[i]?.position.set(b.x, FX.boneUseHeight, b.z));
   }
 
-  sync(bones: readonly Bone[], elapsed: number): void {
-    bones.forEach((b, i) => {
+  sync(boneUses: readonly BoneUse[], elapsed: number): void {
+    boneUses.forEach((b, i) => {
       const m = this.meshes[i];
       if (!m) {
         return;
@@ -272,7 +282,7 @@ export class BonesView {
       m.rotation.y = b.spin;
       m.position.set(
         b.x,
-        FX.boneHeight + Math.sin(elapsed * FX.boneBobRate + b.x) * FX.boneBob,
+        FX.boneUseHeight + Math.sin(elapsed * FX.boneUseBobRate + b.x) * FX.boneUseBob,
         b.z,
       );
     });

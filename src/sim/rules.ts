@@ -1,4 +1,4 @@
-import { RULES } from '../config';
+import { RULES, TAIL } from '../config';
 import type { Vec3 } from '../core/math';
 
 export interface LickReach {
@@ -40,11 +40,21 @@ export function lickPoints(combo: number): number {
   return RULES.pointsPerLick * combo;
 }
 
-export function canPickBone(dog: Readonly<Vec3>, boneX: number, boneZ: number): boolean {
+export function canPickBoneUse(dog: Readonly<Vec3>, boneX: number, boneZ: number): boolean {
   return (
-    Math.hypot(boneX - dog.x, boneZ - dog.z) < RULES.bonePickupRange &&
+    Math.hypot(boneX - dog.x, boneZ - dog.z) < RULES.boneUsePickupRange &&
     dog.y < RULES.maxActionHeight
   );
+}
+
+/** Tail wag rate multiplier: the burst multiplier while `wagBurstT` seconds remain, else 1. */
+export function tailWagMultiplier(wagBurstT: number): number {
+  return wagBurstT > 0 ? TAIL.burstMultiplier : 1;
+}
+
+/** Remaining wag burst seconds after `dt`, never below zero. */
+export function tickWagBurst(wagBurstT: number, dt: number): number {
+  return Math.max(0, wagBurstT - dt);
 }
 
 /** The best score after a round ending with `score`. */

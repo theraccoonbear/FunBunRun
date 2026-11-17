@@ -2,7 +2,7 @@
 
 A small 3D browser game. Play a very good dog chasing a bunny through a park. The goal is to **lick** the bunny, not eat it. A person is attached to the other end of the leash and gets dragged along for the whole round.
 
-Golden bones refill stamina, lick streaks multiply points, and the bunny tires out if the pressure is kept up. A round lasts 90 seconds.
+Golden bone-uses (collecting one shouts "BONE-US!") refill stamina, lick streaks multiply points, and the bunny tires out if the pressure is kept up. A round lasts 90 seconds.
 
 ## Play
 

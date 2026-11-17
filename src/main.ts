@@ -13,9 +13,9 @@ import { followCamera, menuCamera } from './render/camera';
 import { Hearts, TrailView, updateSniffAtmosphere } from './render/fx';
 import { makeProps } from './render/models';
 import { configureColorPipeline, createScene } from './render/scene';
-import { BonesView, BunnyView, DogView, PersonView } from './render/views';
+import { BoneUsesView, BunnyView, DogView, PersonView } from './render/views';
 import { Game } from './sim/game';
-import { formatClock } from './sim/rules';
+import { formatClock, tailWagMultiplier } from './sim/rules';
 import { $, Hud } from './ui/hud';
 import { Menu } from './ui/menu';
 
@@ -31,7 +31,7 @@ const game = new Game({ best: loadBest(store) });
 kit.scene.add(makeProps(game.world));
 const dogView = new DogView(kit.scene);
 const bunnyView = new BunnyView(kit.scene);
-const bonesView = new BonesView(kit.scene, game.bones.length);
+const boneUsesView = new BoneUsesView(kit.scene, game.boneUses.length);
 const personView = new PersonView(kit.scene);
 const trailView = new TrailView(kit.scene, game.scent.drops.length);
 const hearts = new Hearts(kit.scene, fxRng);
@@ -85,9 +85,9 @@ game.events.on('yank', (e) => {
   hud.pop(e.message, '#bfe3ff');
   sfx.oof();
 });
-game.events.on('bone', (e) => {
-  hud.pop('Bone! +' + e.points, '#ffd34d');
-  sfx.bone();
+game.events.on('boneUse', (e) => {
+  hud.popBoneUse(e.points);
+  sfx.boneUse();
 });
 game.events.on('roundOver', (r) => {
   if (r.bestChanged) {
@@ -112,11 +112,11 @@ function frame(dt: number): void {
   const s = game.session;
 
   if (wasPlaying) {
-    dogView.sync(game.dog, s.elapsed, game.dogLickT);
+    dogView.sync(game.dog, s.elapsed, game.dogLickT, tailWagMultiplier(game.wagBurstT));
     followCamera(kit.camera, game.dog.pos, game.look, game.basis, game.sprinting, dt);
     bunnyView.sync(game.bunny);
     personView.sync();
-    bonesView.sync(game.bones, s.elapsed);
+    boneUsesView.sync(game.boneUses, s.elapsed);
 
     const sniffing = actions.sniff;
     updateSniffAtmosphere(kit, sniffing, dt);
@@ -152,7 +152,7 @@ function frame(dt: number): void {
 addEventListener('resize', () => kit.resize());
 
 dogView.place(game.dog);
-bonesView.place(game.bones);
+boneUsesView.place(game.boneUses);
 personView.bind(game.rag);
 showMenu(null);
 installDebugHook(game, location.search);

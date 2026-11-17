@@ -7,7 +7,7 @@ export interface Sfx {
   init(): void;
   slurp(): void;
   miss(): void;
-  bone(): void;
+  boneUse(): void;
   jump(): void;
   oof(): void;
 }
@@ -53,7 +53,12 @@ export function createSfx(): Sfx {
       setTimeout(() => tone('sine', 900, 1500, 0.12, 0.15), 160);
     },
     miss: () => tone('triangle', 260, 160, 0.12, 0.12),
-    bone: () => tone('square', 660, 1320, 0.15, 0.1),
+    // Happy yip-yip: two quick rising barks and a bright sparkle on top.
+    boneUse() {
+      tone('sawtooth', 520, 880, 0.09, 0.16);
+      setTimeout(() => tone('sawtooth', 640, 1100, 0.1, 0.16), 110);
+      setTimeout(() => tone('square', 880, 1500, 0.14, 0.09), 230);
+    },
     jump: () => tone('sine', 300, 520, 0.12, 0.08),
     oof: () => tone('sawtooth', 220, 90, 0.35, 0.2),
   };

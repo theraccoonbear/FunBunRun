@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { LEASH_LENGTH, ROUND_SECONDS, RULES, YANK_MESSAGES } from '../../src/config';
+import { LEASH_LENGTH, ROUND_SECONDS, RULES, TAIL, YANK_MESSAGES } from '../../src/config';
 import { createRng } from '../../src/core/rng';
 import { Game, type FrameInput, type GameEvents } from '../../src/sim/game';
 
@@ -20,15 +20,15 @@ function newGame(best = 0): Game {
 }
 
 describe('Game', () => {
-  it('generates a world with 12 bones and starts in the menu', () => {
+  it('generates a world with 12 bone-uses and starts in the menu', () => {
     const g = newGame();
-    expect(g.bones).toHaveLength(12);
+    expect(g.boneUses).toHaveLength(12);
     expect(g.phase).toBe('menu');
   });
 
   it('is reproducible with a seeded RNG', () => {
     expect(newGame().world).toEqual(newGame().world);
-    expect(newGame().bones).toEqual(newGame().bones);
+    expect(newGame().boneUses).toEqual(newGame().boneUses);
   });
 
   it('defaults to Math.random', () => {
@@ -108,21 +108,59 @@ describe('Game', () => {
     expect(g.session.lickT).toBeGreaterThan(0);
   });
 
-  it('collects a bone: score, full stamina, bone moves elsewhere', () => {
+  it('collects a bone-use: score, full stamina, it moves elsewhere', () => {
     const g = newGame();
-    const onBone = vi.fn();
-    g.events.on('bone', onBone);
+    const onBoneUse = vi.fn();
+    g.events.on('boneUse', onBoneUse);
     g.start();
-    const bone = g.bones[0]!;
-    bone.x = 0.5;
-    bone.z = 0;
+    const boneUse = g.boneUses[0]!;
+    boneUse.x = 0.5;
+    boneUse.z = 0;
     g.dog.stam = 0.2;
     g.update(DT, idle);
-    expect(onBone).toHaveBeenCalledWith({ points: RULES.bonePoints });
-    expect(g.session.score).toBe(RULES.bonePoints);
+    expect(onBoneUse).toHaveBeenCalledWith({ points: RULES.boneUsePoints });
+    expect(g.session.score).toBe(RULES.boneUsePoints);
     expect(g.dog.stam).toBeGreaterThan(0.99);
-    expect(Math.hypot(bone.x, bone.z)).toBeGreaterThan(1.4);
-    expect(bone.spin).toBeGreaterThan(0);
+    expect(Math.hypot(boneUse.x, boneUse.z)).toBeGreaterThan(1.4);
+    expect(boneUse.spin).toBeGreaterThan(0);
+  });
+
+  it('emits one boneUse event per pickup and none when out of reach', () => {
+    const g = newGame();
+    const onBoneUse = vi.fn();
+    g.events.on('boneUse', onBoneUse);
+    g.start();
+    g.update(DT, idle);
+    expect(onBoneUse).not.toHaveBeenCalled();
+    g.boneUses[0]!.x = 0.5;
+    g.boneUses[0]!.z = 0;
+    g.update(DT, idle);
+    g.update(DT, idle);
+    expect(onBoneUse).toHaveBeenCalledOnce();
+  });
+
+  it('starts a tail-wag burst on pickup that runs out after the configured time', () => {
+    const g = newGame();
+    g.start();
+    expect(g.wagBurstT).toBe(0);
+    g.boneUses[0]!.x = 0.5;
+    g.boneUses[0]!.z = 0;
+    g.update(DT, idle);
+    expect(g.wagBurstT).toBeGreaterThan(TAIL.burstSeconds - 2 * DT);
+    expect(g.wagBurstT).toBeLessThanOrEqual(TAIL.burstSeconds);
+    for (let t = 0; t < TAIL.burstSeconds + 0.1; t += DT) {
+      g.update(DT, idle);
+    }
+    expect(g.wagBurstT).toBe(0);
+  });
+
+  it('clears the wag burst when a new round starts', () => {
+    const g = newGame();
+    g.start();
+    g.wagBurstT = 0.5;
+    g.session.phase = 'over';
+    g.start();
+    expect(g.wagBurstT).toBe(0);
   });
 
   it('keeps the person within leash range while the dog sprints', () => {
