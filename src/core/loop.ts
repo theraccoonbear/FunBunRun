@@ -21,7 +21,10 @@ export class FixedStepper {
       this.acc -= this.step;
       n++;
     }
-    if (n === this.maxSteps) {
+    // Drop the backlog only if one remains after the cap. The prototype's
+    // `n === 4` check could not trigger with the dt cap (at most 3 steps are
+    // ever due), and when it did it would also discard a valid remainder.
+    if (this.acc >= this.step) {
       this.acc = 0;
     }
     return n;

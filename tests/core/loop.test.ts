@@ -12,9 +12,23 @@ describe('FixedStepper', () => {
     expect(s.pending).toBeCloseTo(0.001);
   });
 
-  it('caps the steps per frame', () => {
+  it('caps the steps per frame and drops the backlog beyond the cap', () => {
     const s = new FixedStepper(0.01, 3);
     expect(s.advance(0.1, () => {})).toBe(3);
+    expect(s.pending).toBe(0);
+  });
+
+  it('keeps the remainder when the cap is reached exactly', () => {
+    const s = new FixedStepper(0.01, 4);
+    expect(s.advance(0.045, () => {})).toBe(4);
+    expect(s.pending).toBeCloseTo(0.005);
+  });
+
+  it('never needs the cap at the game settings (1/60 s steps, 4 max, dt <= 0.05)', () => {
+    const s = new FixedStepper(1 / 60, 4);
+    for (let i = 0; i < 1000; i++) {
+      expect(s.advance(0.05, () => {})).toBeLessThanOrEqual(3);
+    }
   });
 
   it('reset() drops pending time', () => {
