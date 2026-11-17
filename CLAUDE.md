@@ -14,8 +14,8 @@ Browser game: a dog chases a bunny through a 3D park to lick it, with a person d
 
 ## Branches and PRs
 
-- Always branch from an up-to-date `main`. Prefixes: `feature/`, `fix/`, `chore/`, `ci/`, `docs/`, `perf/`.
-- Squash merges. Commit and PR titles use conventional-commit subjects (`feat:`, `fix:`, `chore:`, `ci:`, `docs:`, `perf:`, `test:`, `build:`).
+- Branch from `main`. Prefixes: `feature/`, `fix/`, `chore/`, `ci/`, `docs/`, `perf/`.
+- Squash-only merges. Branches do not need to be up to date with `main` before merging. Enable auto-merge with `gh pr merge N --auto --squash`. Commit and PR titles use conventional-commit subjects (`feat:`, `fix:`, `chore:`, `ci:`, `docs:`, `perf:`, `test:`, `build:`).
 - Every PR links an issue (`Closes #N`).
 - Do not lint or reformat `public/legacy/index.html`; it is excluded from ESLint and Prettier.
 
@@ -38,7 +38,7 @@ Merging PRs, pushing to `main`, tags/releases and repository settings need an ex
 
 ## Deployment
 
-- Production: https://theraccoonbear.github.io/FunBunRun/ (gh-pages root, published on push to `main`)
+- Production: https://theraccoonbear.github.io/FunBunRun/ (gh-pages root). Deploys run only after CI is green on `main` (`deploy-pages.yml` is triggered by the CI run), so a red `main` is never published. If `main` goes red after a merge, fix forward or revert promptly.
 - PR previews: https://theraccoonbear.github.io/FunBunRun/pr-N/ (published per PR, removed on close)
 - Pages source must be "Deploy from a branch" (gh-pages, /root). Publishing goes through `.github/scripts/publish-gh-pages.sh`.
 - URL paths are case-sensitive: the base is `/FunBunRun/`.
