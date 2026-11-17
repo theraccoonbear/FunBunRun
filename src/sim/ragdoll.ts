@@ -53,6 +53,8 @@ export interface RagdollStatus {
   /** Cooldown before the next yank can register. */
   yank: number;
   walkPh: number;
+  /** Walk leg/arm swing, -1..1; eases back to 0 after the person stops walking. */
+  swing: number;
   /** Metres the person has been dragged while down. */
   dragged: number;
   /** Set when a yank knocks the person down; the game clears it. */
@@ -149,6 +151,7 @@ export function makeRagdollSim(opts: RagdollOptions): Ragdoll {
     tension: 0,
     yank: 0,
     walkPh: 0,
+    swing: 0,
     dragged: 0,
   };
 
@@ -227,15 +230,17 @@ export function makeRagdollSim(opts: RagdollOptions): Ragdoll {
       fz /= fd;
       const rx = -fz;
       const rz = fx;
-      let swing = 0;
+      // The swing persists across steps so it eases out after walking stops
+      // (it was a per-step local, so the decay below always decayed 0).
       if (standing && fd > L * RAGDOLL.followFraction) {
         const sp = RAGDOLL.walkSpeed * h * rec;
         shiftBody(fx * sp, fz * sp);
         st.walkPh += h * RAGDOLL.walkPhaseRate;
-        swing = Math.sin(st.walkPh);
+        st.swing = Math.sin(st.walkPh);
       } else {
-        swing *= RAGDOLL.swingDecay;
+        st.swing *= RAGDOLL.swingDecay;
       }
+      const swing = st.swing;
       const T = (x: number, y: number, z: number): [number, number, number] => [x, y, z];
       const pose: [Particle, [number, number, number]][] = [
         [b.lFoot, T(Fx - rx * 0.12 + fx * swing * 0.25, 0.08, Fz - rz * 0.12 + fz * swing * 0.25)],

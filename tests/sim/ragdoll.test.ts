@@ -100,6 +100,32 @@ describe('makeRagdollSim', () => {
     expect(r.st.dragged).toBeGreaterThan(1);
   });
 
+  it('eases the walk swing out between walking steps instead of snapping it to 0', () => {
+    const r = make();
+    const c = { ...collar };
+    for (let i = 0; i < 240; i++) {
+      c.z -= 1.5 * H;
+      r.step(H, c, noCollide);
+    }
+    // The dog stops; the person catches up and only takes the odd step.
+    let prevPh = r.st.walkPh;
+    let prevSwing = r.st.swing;
+    let idleSteps = 0;
+    for (let i = 0; i < 240; i++) {
+      r.step(H, c, noCollide);
+      if (r.st.walkPh === prevPh) {
+        idleSteps++;
+        expect(r.st.swing).toBeCloseTo(prevSwing * RAGDOLL.swingDecay, 12);
+        if (prevSwing !== 0) {
+          expect(r.st.swing).not.toBe(0);
+        }
+      }
+      prevPh = r.st.walkPh;
+      prevSwing = r.st.swing;
+    }
+    expect(idleSteps).toBeGreaterThan(100);
+  });
+
   it('passes each body particle to the collision callback every step', () => {
     const r = make();
     const seen = new Set<Particle>();
