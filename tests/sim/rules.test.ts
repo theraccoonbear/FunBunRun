@@ -64,14 +64,18 @@ describe('best score', () => {
     expect(updatedBest(200, 300)).toBe(300);
   });
 
-  it('shows "New best!" for a new record but not for zero', () => {
-    expect(showsNewBest(500, updatedBest(500, 300))).toBe(true);
-    expect(showsNewBest(200, updatedBest(200, 300))).toBe(false);
-    expect(showsNewBest(0, updatedBest(0, 0))).toBe(false);
+  it('shows "New best!" only when the previous best is strictly beaten', () => {
+    expect(showsNewBest(500, 300)).toBe(true);
+    expect(showsNewBest(200, 300)).toBe(false);
   });
 
-  it('also shows "New best!" on a tie (prototype behaviour, #5)', () => {
-    expect(showsNewBest(300, updatedBest(300, 300))).toBe(true);
+  it('does not show "New best!" on a tie (#5)', () => {
+    expect(showsNewBest(300, 300)).toBe(false);
+  });
+
+  it('counts a first-ever positive score as a new best, but not zero', () => {
+    expect(showsNewBest(50, 0)).toBe(true);
+    expect(showsNewBest(0, 0)).toBe(false);
   });
 });
 
