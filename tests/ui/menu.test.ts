@@ -1,0 +1,26 @@
+import { describe, expect, it } from 'vitest';
+import { menuHtml } from '../../src/ui/menu';
+
+describe('menuHtml', () => {
+  it('shows the intro and start button first', () => {
+    const html = menuHtml(false, null);
+    expect(html).toContain('You are a very good dog');
+    expect(html).toContain("<button id='go'>Start running</button>");
+    expect(html).toContain('<b>WASD</b>');
+  });
+
+  it('shows the round summary and touch controls', () => {
+    const html = menuHtml(true, { licks: 3, score: 600, dragged: 12.6, newBest: false, best: 900 });
+    expect(html).toContain('<b>3</b> licks, <b>600</b> points');
+    expect(html).toContain('Human dragged: <b>13 m</b>');
+    expect(html).toContain('Best: 900');
+    expect(html).toContain('<b>Left thumb</b>');
+    expect(html).toContain('Run again');
+  });
+
+  it('celebrates a new best', () => {
+    expect(
+      menuHtml(false, { licks: 1, score: 100, dragged: 0, newBest: true, best: 100 }),
+    ).toContain('New best!');
+  });
+});

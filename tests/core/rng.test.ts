@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { createRng } from '../../src/core/rng';
+import { describe, expect, it, vi } from 'vitest';
+import { createRng, mathRandomRng } from '../../src/core/rng';
 
 const sample = (seed: number, n: number): number[] => {
   const rng = createRng(seed);
@@ -54,5 +54,17 @@ describe('createRng', () => {
 
   it('pick() throws on an empty array', () => {
     expect(() => createRng(1).pick([])).toThrow();
+  });
+});
+
+describe('mathRandomRng', () => {
+  it('draws from Math.random', () => {
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const rng = mathRandomRng();
+    expect(rng.next()).toBe(0.5);
+    expect(rng.range(0, 10)).toBe(5);
+    expect(rng.int(0, 4)).toBe(2);
+    expect(rng.pick(['a', 'b', 'c', 'd'])).toBe('c');
+    spy.mockRestore();
   });
 });
