@@ -13,6 +13,13 @@ test('the debug hook is only installed with ?debug', async ({ page }) => {
   await page.goto('./');
   await expect(page.locator('canvas')).toBeVisible();
   expect(await page.evaluate(() => typeof window.__fbr)).toBe('undefined');
+  await expect(page.locator('#padDebug')).toHaveCount(0);
+});
+
+test('?debug shows the read-only gamepad panel', async ({ page }) => {
+  await page.goto('./?debug');
+  await expect(page.locator('#padDebug')).toContainText('gamepads');
+  await expect(page.locator('#padDebug')).toHaveCSS('pointer-events', 'none');
 });
 
 test('?seed=123 produces the same world layout on every load', async ({ page }) => {

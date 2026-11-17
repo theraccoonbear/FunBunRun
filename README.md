@@ -39,6 +39,8 @@ Live: <https://theraccoonbear.github.io/FunBunRun/>
 | B / LT      | Sniff                     |
 | LB / L3     | Sprint                    |
 
+Buttons are listed by Xbox position. PlayStation and Nintendo pads are detected from the pad name, and the menu and lick hint switch to their labels (✕ □ ○ L1, or B Y A L). With several pads connected, the one used most recently controls the dog. Pads without the browser's standard mapping (common on Linux Firefox) use a best-effort layout guess; see `readPad` in `src/input/gamepad.ts` for its limits. `?debug` adds a panel with each pad's raw buttons and axes.
+
 ## Status
 
 The game is written in TypeScript with three.js; see `CLAUDE.md` for the module layout and [issue #1](https://github.com/theraccoonbear/FunBunRun/issues/1) for the port from the original prototype.
