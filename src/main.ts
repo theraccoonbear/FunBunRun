@@ -13,12 +13,14 @@ import { followCamera, menuCamera } from './render/camera';
 import { Hearts, TrailView, updateSniffAtmosphere } from './render/fx';
 import { disposeProps, makeProps } from './render/models';
 import { configureColorPipeline, createScene } from './render/scene';
+import { viewportSize, watchViewport } from './render/viewport';
 import { BonesView, BunnyView, DogView, PersonView } from './render/views';
 import { Game } from './sim/game';
 import { SimRunner } from './sim/runner';
 import { formatClock } from './sim/rules';
 import { $, Hud } from './ui/hud';
 import { Menu } from './ui/menu';
+import { RotateHint } from './ui/orientation';
 
 configureColorPipeline();
 
@@ -168,7 +170,14 @@ function frame(dt: number): void {
   kit.render();
 }
 
-addEventListener('resize', () => kit.resize());
+const rotateHint = new RotateHint($('rotateHint'), $('rotateDismiss'));
+function onViewportChange(): void {
+  kit.resize();
+  const { width, height } = viewportSize(window);
+  rotateHint.update(width, height);
+}
+watchViewport(window, onViewportChange);
+onViewportChange();
 
 dogView.place(game.dog);
 bonesView.place(game.bones);
