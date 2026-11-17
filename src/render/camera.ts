@@ -29,8 +29,12 @@ export function followCamera(
   );
   camera.lookAt(tx, ty, tz);
   const fovT = sprinting ? CAMERA.sprintFov : CAMERA.fov;
-  camera.fov += (fovT - camera.fov) * smoothing(CAMERA.fovRate, dt, SIM.step);
-  camera.updateProjectionMatrix();
+  const fov = camera.fov + (fovT - camera.fov) * smoothing(CAMERA.fovRate, dt, SIM.step);
+  // The projection only needs rebuilding while the FOV is actually moving.
+  if (fov !== camera.fov) {
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+  }
 }
 
 /** Menu: slow orbit around the bunny's start spot. */

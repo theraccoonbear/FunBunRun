@@ -61,13 +61,13 @@ export function freeSpot(
   for (let i = 0; i < WORLD.placementAttempts; i++) {
     const x = (rng.next() * 2 - 1) * extent;
     const z = (rng.next() * 2 - 1) * extent;
-    if (Math.hypot(x, z) < WORLD.spawnClearRadius) {
+    if (Math.sqrt(x * x + z * z) < WORLD.spawnClearRadius) {
       continue;
     }
     let ok = true;
     for (const o of obstacles) {
       closestOnSegment(o, x, z, scratch);
-      if (Math.hypot(x - scratch.x, z - scratch.z) < o.r + minR) {
+      if (Math.sqrt((x - scratch.x) ** 2 + (z - scratch.z) ** 2) < o.r + minR) {
         ok = false;
         break;
       }

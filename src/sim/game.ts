@@ -11,7 +11,14 @@ import {
   type BunnyState,
 } from './bunny';
 import { collide } from './collision';
-import { collarWorld, createDog, resetDog, updateDog, type DogState } from './dog';
+import {
+  collarWorld,
+  createDog,
+  resetDog,
+  updateDog,
+  type DogState,
+  type DogStepResult,
+} from './dog';
 import {
   createSession,
   scoreLick,
@@ -107,6 +114,7 @@ export class Game {
   camYaw = 0;
   /** Lick timer as it was when the dog moved in the last step (drives the head and tongue pose). */
   dogLickT = 0;
+  private readonly dogStep: DogStepResult = { sprinting: false, jumped: false };
   private readonly ragCollide = (p: Particle): void =>
     collide(this.world.obstacles, this.world.half, p, p.r, 0);
 
@@ -201,19 +209,12 @@ export class Game {
     const res = updateDog(
       d,
       this.look,
-      {
-        moveX: input.moveX,
-        moveY: input.moveY,
-        lookX: input.lookX,
-        lookY: input.lookY,
-        turn: input.turn,
-        sprint: input.sprint,
-        jump: input.jump,
-      },
+      input,
       this.rag.st.tension,
       this.world,
       dt,
       this.basis,
+      this.dogStep,
     );
     this.sprinting = res.sprinting;
     this.camYaw = Math.atan2(-this.basis.fx, -this.basis.fz);

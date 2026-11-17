@@ -90,6 +90,7 @@ export function placeDog(d: DogState): void {
 /**
  * One sim step of dog movement, camera look and gait. `basis` receives the
  * camera-relative movement basis used in this step (before auto-follow).
+ * The result is written into `out` (allocated per call only when omitted).
  */
 export function updateDog(
   d: DogState,
@@ -99,12 +100,13 @@ export function updateDog(
   world: World,
   dt: number,
   basis: Basis,
+  out: DogStepResult = { sprinting: false, jumped: false },
 ): DogStepResult {
   applyLook(look, input.lookX, input.lookY, input.turn, dt);
 
   let mx = input.moveX;
   let my = input.moveY;
-  const len = Math.hypot(mx, my);
+  const len = Math.sqrt(mx * mx + my * my);
   if (len > 1) {
     mx /= len;
     my /= len;
@@ -142,7 +144,7 @@ export function updateDog(
   }
   collide(world.obstacles, world.half, d.pos, DOG.radius, 0);
 
-  const hs = Math.hypot(d.vel.x, d.vel.z);
+  const hs = Math.sqrt(d.vel.x * d.vel.x + d.vel.z * d.vel.z);
   if (hs > DOG.turnMinSpeed) {
     const target = Math.atan2(d.vel.x, d.vel.z);
     d.h = wrapAngle(d.h + wrapAngle(target - d.h) * Math.min(1, dt * DOG.turnRate));
@@ -160,7 +162,9 @@ export function updateDog(
   d.pose.bodyY = DOG_MODEL.bodyRestY + Math.abs(Math.sin(d.ph)) * DOG_MODEL.bodyBob * amp;
   d.pose.pitch = Math.sin(d.ph) * DOG_MODEL.bodyPitch * amp;
 
-  return { sprinting, jumped };
+  out.sprinting = sprinting;
+  out.jumped = jumped;
+  return out;
 }
 
 /**

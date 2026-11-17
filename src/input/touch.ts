@@ -26,6 +26,7 @@ export class TouchControls {
   sniff = false;
   private joyId: number | null = null;
   private joy: Joystick = createJoystick(0, 0);
+  private knobSprint = false;
   private lookId: number | null = null;
   private lookLastX = 0;
   private lookLastY = 0;
@@ -110,7 +111,10 @@ export class TouchControls {
       this.moveX = j.moveX;
       this.moveY = j.moveY;
       this.sprint = j.sprint;
-      this.el.joyKnob.className = j.sprint ? 'sprint' : '';
+      if (j.sprint !== this.knobSprint) {
+        this.knobSprint = j.sprint;
+        this.el.joyKnob.className = j.sprint ? 'sprint' : '';
+      }
       this.el.joyKnob.style.transform = 'translate(' + j.knobX + 'px,' + j.knobY + 'px)';
     } else if (e.pointerId === this.lookId) {
       this.actions.addLook(
