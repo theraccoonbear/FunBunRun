@@ -4,7 +4,14 @@ import { mathRandomRng, parseSeed } from './core/rng';
 import { createSfx } from './audio/sfx';
 import { installDebugHook } from './debug';
 import { Actions, EdgeDetector } from './input/actions';
-import { pollGamepads, readGamepads } from './input/gamepad';
+import {
+  GLYPHS,
+  padFamily,
+  PadTracker,
+  pollGamepads,
+  readGamepads,
+  type PadFamily,
+} from './input/gamepad';
 import { Keyboard } from './input/keyboard';
 import { attachPointer, releasePointer } from './input/pointer';
 import { detectTouch, TouchControls } from './input/touch';
@@ -19,6 +26,7 @@ import { SimRunner } from './sim/runner';
 import { formatClock } from './sim/rules';
 import { $, Hud } from './ui/hud';
 import { Menu } from './ui/menu';
+import { installPadDebugPanel } from './ui/pad-debug';
 
 configureColorPipeline();
 
@@ -116,12 +124,37 @@ keyboard.attach(window);
 attachPointer(kit.renderer.domElement, actions, { isPlaying, isTouch });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 const padEdges = new EdgeDetector();
+const padTracker = new PadTracker();
+let padShown: PadFamily | null = null;
+
+/** Switches menu and HUD button labels to the active pad's family (none: keyboard labels). */
+function syncPadGlyphs(pads: ReturnType<typeof readGamepads>): void {
+  const active = pads.find((p) => p && p.index === padTracker.active && p.connected !== false);
+  const family = active ? padFamily(active.id ?? '') : null;
+  if (family === padShown) {
+    return;
+  }
+  padShown = family;
+  menu.setPad(family);
+  hud.setLickGlyph(family ? GLYPHS[family].lick : null);
+}
+addEventListener('gamepadconnected', () => syncPadGlyphs(readGamepads()));
+addEventListener('gamepaddisconnected', () => {
+  // TODO(#7): pause the round on disconnect once the pause state exists.
+  const pads = readGamepads();
+  padTracker.select(pads);
+  syncPadGlyphs(pads);
+});
+const updatePadDebug = installPadDebugPanel(location.search, readGamepads, () => padTracker.active);
 
 /** One rendered frame: sample input, run the sim steps due, draw the interpolated state. */
 function frame(dt: number): void {
   keyboard.apply();
   touch.apply();
-  pollGamepads(readGamepads(), padEdges, actions, { isPlaying, onStart: startGame }, dt);
+  const pads = readGamepads();
+  pollGamepads(pads, padEdges, actions, { isPlaying, onStart: startGame }, dt, padTracker);
+  syncPadGlyphs(pads);
+  updatePadDebug?.();
 
   const wasPlaying = isPlaying();
   runner.frame(dt, actions);

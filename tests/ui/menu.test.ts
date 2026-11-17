@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { menuHtml } from '../../src/ui/menu';
+import { menuHtml, padControls } from '../../src/ui/menu';
 
 describe('menuHtml', () => {
   it('shows the intro and start button first', () => {
@@ -30,5 +30,22 @@ describe('menuHtml', () => {
     expect(
       menuHtml(false, { licks: 1, score: 100, dragged: 0, newBest: true, best: 100, seed: 1 }),
     ).toContain('New best!');
+  });
+
+  it('keeps the generic gamepad line on desktop when no pad is connected', () => {
+    expect(menuHtml(false, null)).toContain(
+      'Gamepad works too (A jump, X lick, B sniff, LB sprint)',
+    );
+    expect(menuHtml(true, null)).not.toContain('Gamepad');
+  });
+
+  it('shows the connected pad family labels, also on touch devices', () => {
+    expect(menuHtml(false, null, 'playstation')).toContain(
+      'Gamepad: <b>✕</b> jump, <b>□</b> lick, <b>○</b> sniff, <b>L1</b> sprint',
+    );
+    expect(menuHtml(true, null, 'nintendo')).toContain('Gamepad: ' + padControls('nintendo'));
+    expect(padControls('nintendo')).toBe(
+      '<b>B</b> jump, <b>Y</b> lick, <b>A</b> sniff, <b>L</b> sprint',
+    );
   });
 });

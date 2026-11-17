@@ -46,6 +46,11 @@ export class Hud {
     this.stamFill.style.width = (f.stamina * 100).toFixed(0) + '%';
   }
 
+  /** Shows the gamepad's lick button in the lick hint ("LICK! (X)"), or plain "LICK!" with null. */
+  setLickGlyph(glyph: string | null): void {
+    this.hint.textContent = glyph ? 'LICK! (' + glyph + ')' : 'LICK!';
+  }
+
   pop(text: string, color = '#fff'): void {
     const el = this.popEl;
     el.textContent = text;
