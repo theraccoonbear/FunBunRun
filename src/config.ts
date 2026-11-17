@@ -200,7 +200,12 @@ export const RAGDOLL = {
 
 export const STORAGE_KEYS = {
   best: 'funbunrun-best',
+  /** Number of rounds finished on this device, for onboarding hints. */
+  rounds: 'funbunrun-rounds',
 } as const;
+
+/** Touch zone hints stay visible during play until this many rounds have been finished. */
+export const ONBOARDING_ROUNDS = 2;
 
 export const SNIFF = {
   /** Scent trail markers fade over this many seconds. */

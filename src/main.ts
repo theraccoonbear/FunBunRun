@@ -1,4 +1,4 @@
-import { BUNNY, SIM } from './config';
+import { BUNNY, INPUT, ONBOARDING_ROUNDS, SIM } from './config';
 import { startLoop } from './core/loop';
 import { mathRandomRng, parseSeed } from './core/rng';
 import { createSfx } from './audio/sfx';
@@ -8,7 +8,8 @@ import { pollGamepads, readGamepads } from './input/gamepad';
 import { Keyboard } from './input/keyboard';
 import { attachPointer, releasePointer } from './input/pointer';
 import { detectTouch, TouchControls } from './input/touch';
-import { loadBest, localStore, saveBest } from './platform/storage';
+import { attachDeviceDetection, InputDeviceTracker, padHasInput } from './input/device';
+import { loadBest, loadRounds, localStore, saveBest, saveRounds } from './platform/storage';
 import { followCamera, menuCamera } from './render/camera';
 import { Hearts, TrailView, updateSniffAtmosphere } from './render/fx';
 import { disposeProps, makeProps } from './render/models';
@@ -19,14 +20,18 @@ import { SimRunner } from './sim/runner';
 import { formatClock } from './sim/rules';
 import { $, Hud } from './ui/hud';
 import { Menu } from './ui/menu';
+import { TouchHints, touchHintsVisible } from './ui/touch-hints';
 
 configureColorPipeline();
 
-const isTouch = detectTouch();
+// Touch capability only picks the starting guess for the last-used device and
+// the antialiasing choice; all input methods stay active (#6).
+const touchCapable = detectTouch();
+const devices = new InputDeviceTracker(touchCapable ? 'touch' : 'mouse');
 const store = localStore();
 // Cosmetic randomness (grass speckles, heart bursts) stays separate from the sim stream.
 const fxRng = mathRandomRng();
-const kit = createScene(isTouch, fxRng);
+const kit = createScene(touchCapable, fxRng);
 // `?seed=<n>` forces the world seed for every round; otherwise each round draws a random one.
 const forcedSeed = parseSeed(location.search);
 const game = new Game({
@@ -60,15 +65,34 @@ const touch = new TouchControls(
   },
   actions,
 );
-const menu = new Menu($('overlay'), $('card'), isTouch, () => startGame());
+const menu = new Menu($('overlay'), $('card'), devices.isTouch, () => startGame());
 
 function startGame(): void {
   sfx.init();
   game.start();
 }
 
+/** Touch buttons and hints follow the last-used device; the touch zones stay live during a round. */
+const touchHints = new TouchHints($('touchHints'));
+let roundsDone = loadRounds(store);
+
+function syncTouchUi(): void {
+  touch.setVisible(isPlaying(), isPlaying() && devices.isTouch);
+  touchHints.setVisible(
+    touchHintsVisible({
+      touch: devices.isTouch,
+      playing: isPlaying(),
+      roundsDone,
+      onboardingRounds: ONBOARDING_ROUNDS,
+    }),
+  );
+  menu.setTouch(devices.isTouch);
+  document.body.dataset.input = devices.device;
+}
+devices.onChange(syncTouchUi);
+
 function showMenu(summary: Parameters<Menu['show']>[0]): void {
-  touch.setVisible(false);
+  syncTouchUi();
   releasePointer();
   menu.show(summary);
 }
@@ -84,9 +108,7 @@ game.events.on('start', () => {
   personView.bind(game.rag);
   trailView.hideAll();
   menu.hide();
-  if (isTouch) {
-    touch.setVisible(true);
-  }
+  syncTouchUi();
   hud.pop('Find the bun!', '#fff');
 });
 game.events.on('jump', () => sfx.jump());
@@ -108,12 +130,15 @@ game.events.on('roundOver', (r) => {
   if (r.bestChanged) {
     saveBest(store, r.best);
   }
+  roundsDone += 1;
+  saveRounds(store, roundsDone);
   showMenu(r);
 });
 
 const keyboard = new Keyboard(actions, { onStart: startGame, isPlaying });
 keyboard.attach(window);
-attachPointer(kit.renderer.domElement, actions, { isPlaying, isTouch });
+attachPointer(kit.renderer.domElement, $('touch'), actions, { isPlaying });
+attachDeviceDetection(window, devices);
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 const padEdges = new EdgeDetector();
 
@@ -121,7 +146,12 @@ const padEdges = new EdgeDetector();
 function frame(dt: number): void {
   keyboard.apply();
   touch.apply();
-  pollGamepads(readGamepads(), padEdges, actions, { isPlaying, onStart: startGame }, dt);
+  touchHints.setActive(touch.joystickActive, touch.lookActive);
+  const pads = readGamepads();
+  if (padHasInput(pads, INPUT.gamepadDeadzone)) {
+    devices.note('gamepad');
+  }
+  pollGamepads(pads, padEdges, actions, { isPlaying, onStart: startGame }, dt);
 
   const wasPlaying = isPlaying();
   runner.frame(dt, actions);
@@ -173,6 +203,7 @@ addEventListener('resize', () => kit.resize());
 dogView.place(game.dog);
 bonesView.place(game.bones);
 personView.bind(game.rag);
+document.body.dataset.input = devices.device;
 showMenu(null);
 installDebugHook(game, location.search);
 startLoop(frame, SIM.maxFrameDt);

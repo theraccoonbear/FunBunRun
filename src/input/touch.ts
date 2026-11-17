@@ -52,13 +52,27 @@ export class TouchControls {
     );
   }
 
-  /** Shows or hides the touch layer and buttons. */
-  setVisible(on: boolean): void {
-    this.el.layer.style.display = on ? 'block' : 'none';
+  /** A finger is currently driving the joystick. */
+  get joystickActive(): boolean {
+    return this.joyId !== null;
+  }
+
+  /** A finger is currently dragging the camera. */
+  get lookActive(): boolean {
+    return this.lookId !== null;
+  }
+
+  /**
+   * Shows or hides the touch layer (the joystick and camera zones; on while a
+   * round runs, whatever the last-used device) and, separately, the buttons
+   * (on only while touch is the last-used device).
+   */
+  setVisible(layer: boolean, buttons: boolean): void {
+    this.el.layer.style.display = layer ? 'block' : 'none';
     for (const b of [this.el.lick, this.el.jump, this.el.sniff]) {
-      b.style.display = on ? 'flex' : 'none';
+      b.style.display = buttons ? 'flex' : 'none';
     }
-    if (!on) {
+    if (!layer) {
       this.el.joyBase.style.display = 'none';
       this.joyId = this.lookId = null;
       this.moveX = this.moveY = 0;
@@ -79,6 +93,11 @@ export class TouchControls {
   }
 
   private onDown(e: PointerEvent): void {
+    // Mouse presses belong to mouse look and licking (see pointer.ts); leave
+    // them alone so a touchscreen laptop keeps both.
+    if (e.pointerType === 'mouse') {
+      return;
+    }
     e.preventDefault();
     try {
       this.el.layer.setPointerCapture(e.pointerId);
@@ -155,7 +174,11 @@ function bindButton(el: HTMLElement, down: () => void, up?: () => void): void {
   el.addEventListener('pointercancel', rel);
 }
 
-/** Touch-first device detection, decided once at load (see #6). */
+/**
+ * Whether the device looks touch-capable. Only the starting guess for the
+ * last-used input device and the antialiasing choice; it never disables an
+ * input method (see `InputDeviceTracker`).
+ */
 export function detectTouch(): boolean {
   return window.matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window;
 }

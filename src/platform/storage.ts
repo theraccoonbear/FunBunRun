@@ -41,6 +41,16 @@ export function loadBest(store: KeyValueStore): number {
   return Number(store.get(STORAGE_KEYS.best)) || 0;
 }
 
+/** Rounds finished on this device; missing, invalid or negative values read as 0. */
+export function loadRounds(store: KeyValueStore): number {
+  const n = Math.floor(Number(store.get(STORAGE_KEYS.rounds)));
+  return n > 0 ? n : 0;
+}
+
+export function saveRounds(store: KeyValueStore, rounds: number): void {
+  store.set(STORAGE_KEYS.rounds, String(rounds));
+}
+
 export function saveBest(store: KeyValueStore, best: number): void {
   store.set(STORAGE_KEYS.best, String(best));
 }

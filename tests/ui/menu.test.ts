@@ -1,5 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { menuHtml } from '../../src/ui/menu';
+import { Menu, menuHtml } from '../../src/ui/menu';
+
+describe('Menu', () => {
+  const fake = (): HTMLElement =>
+    ({ style: {}, innerHTML: '', querySelector: () => null }) as unknown as HTMLElement;
+
+  it('re-renders the help when the last-used device changes while shown', () => {
+    const card = fake();
+    const menu = new Menu(fake(), card, false, () => {});
+    menu.show(null);
+    expect(card.innerHTML).toContain('<b>WASD</b>');
+    menu.setTouch(true);
+    expect(card.innerHTML).toContain('<b>Left thumb</b>');
+    menu.setTouch(false);
+    expect(card.innerHTML).toContain('<b>WASD</b>');
+  });
+
+  it('does not touch the card while hidden', () => {
+    const card = fake();
+    const menu = new Menu(fake(), card, false, () => {});
+    menu.show(null);
+    menu.hide();
+    card.innerHTML = 'x';
+    menu.setTouch(true);
+    expect(card.innerHTML).toBe('x');
+  });
+});
 
 describe('menuHtml', () => {
   it('shows the intro and start button first', () => {
