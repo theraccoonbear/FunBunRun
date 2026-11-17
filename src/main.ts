@@ -66,7 +66,7 @@ function showMenu(summary: Parameters<Menu['show']>[0]): void {
 
 game.events.on('start', () => {
   dogView.place(game.dog);
-  personView.build(game.rag);
+  personView.bind(game.rag);
   trailView.hideAll();
   menu.hide();
   if (isTouch) {
@@ -153,7 +153,7 @@ addEventListener('resize', () => kit.resize());
 
 dogView.place(game.dog);
 bonesView.place(game.bones);
-personView.build(game.rag);
+personView.bind(game.rag);
 showMenu(null);
 installDebugHook(game, location.search);
 startLoop(frame, MAX_FRAME_DT);

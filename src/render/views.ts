@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { FX, RULES } from '../config';
+import { FX, RAGDOLL, RULES } from '../config';
 import type { BunnyState } from '../sim/bunny';
 import type { DogState } from '../sim/dog';
 import type { Bone } from '../sim/game';
-import type { Particle, Ragdoll } from '../sim/ragdoll';
+import type { BodyPart, Particle, Ragdoll } from '../sim/ragdoll';
 import {
   blobShadow,
   boneMaterial,
@@ -102,109 +102,146 @@ function placeLimb(mesh: THREE.Object3D, a: Particle, b: Particle): void {
   mesh.scale.set(1, len, 1);
 }
 
-/** The person and the leash, drawn from the ragdoll particles. */
+type Limb = [BodyPart, BodyPart, THREE.Mesh];
+type Joint = [BodyPart, THREE.Mesh];
+
+/**
+ * The person and the leash, drawn from the ragdoll particles. Meshes,
+ * geometries and materials are created once and rebound to each new
+ * ragdoll, so restarting a round allocates nothing on the GPU.
+ */
 export class PersonView {
-  private readonly skin = new THREE.MeshLambertMaterial({ color: 0xf1c27d });
-  private readonly shirt = new THREE.MeshLambertMaterial({ color: 0x3f7fd9 });
-  private readonly pants = new THREE.MeshLambertMaterial({ color: 0x3b3b55 });
-  private readonly leashMat = new THREE.MeshLambertMaterial({ color: 0xd62e3e });
-  private readonly jointGeo = new THREE.SphereGeometry(1, 8, 6);
-  private readonly meshes: THREE.Object3D[] = [];
-  private limbs: [Particle, Particle, THREE.Mesh][] = [];
-  private joints: [Particle, THREE.Mesh][] = [];
-  private leashSegs: THREE.Mesh[] = [];
-  private headMesh: THREE.Mesh | null = null;
-  private hairMesh: THREE.Mesh | null = null;
-  private shadow: THREE.Group | null = null;
+  private readonly geometries: THREE.BufferGeometry[] = [];
+  private readonly materials: THREE.Material[] = [];
+  private readonly root = new THREE.Group();
+  private readonly limbs: Limb[];
+  private readonly joints: Joint[];
+  private readonly leashSegs: THREE.Mesh[] = [];
+  private readonly headMesh: THREE.Mesh;
+  private readonly hairMesh: THREE.Mesh;
+  private readonly shadow = new THREE.Group();
   private rag: Ragdoll | null = null;
 
-  constructor(private readonly scene: THREE.Scene) {}
-
-  private limbGeo(r: number): THREE.CylinderGeometry {
-    return new THREE.CylinderGeometry(r, r, 1, 8);
-  }
-
-  /** Binds the view to a (new) ragdoll, rebuilding the meshes. */
-  build(rag: Ragdoll): void {
-    for (const m of this.meshes) {
-      this.scene.remove(m);
-    }
-    this.meshes.length = 0;
-    this.rag = rag;
-    const b = rag.body;
-    const add = <T extends THREE.Object3D>(m: T): T => {
-      this.scene.add(m);
-      this.meshes.push(m);
-      return m;
+  constructor(private readonly scene: THREE.Scene) {
+    const mat = (color: number): THREE.MeshLambertMaterial =>
+      this.track(this.materials, new THREE.MeshLambertMaterial({ color }));
+    const skin = mat(0xf1c27d);
+    const shirt = mat(0x3f7fd9);
+    const pants = mat(0x3b3b55);
+    const leashMat = mat(0xd62e3e);
+    const hairMat = mat(0x5a3a1e);
+    // One unit-height cylinder per radius, shared by every limb of that radius.
+    const cylinders = new Map<number, THREE.CylinderGeometry>();
+    const cylinder = (r: number): THREE.CylinderGeometry => {
+      let g = cylinders.get(r);
+      if (!g) {
+        g = this.track(this.geometries, new THREE.CylinderGeometry(r, r, 1, 8));
+        cylinders.set(r, g);
+      }
+      return g;
     };
-    const { skin, shirt, pants } = this;
-    const limb = (r: number, m: THREE.Material): THREE.Mesh =>
-      add(new THREE.Mesh(this.limbGeo(r), m));
-    this.limbs = [
-      [b.neck, b.pelvis, limb(0.17, shirt)],
-      [b.neck, b.lElbow, limb(0.06, shirt)],
-      [b.lElbow, b.lHand, limb(0.05, skin)],
-      [b.neck, b.rElbow, limb(0.06, shirt)],
-      [b.rElbow, b.rHand, limb(0.05, skin)],
-      [b.pelvis, b.lKnee, limb(0.08, pants)],
-      [b.lKnee, b.lFoot, limb(0.07, pants)],
-      [b.pelvis, b.rKnee, limb(0.08, pants)],
-      [b.rKnee, b.rFoot, limb(0.07, pants)],
+    const mesh = (g: THREE.BufferGeometry, m: THREE.Material): THREE.Mesh => {
+      const x = new THREE.Mesh(g, m);
+      this.root.add(x);
+      return x;
+    };
+    const limb = (a: BodyPart, b: BodyPart, r: number, m: THREE.Material): Limb => [
+      a,
+      b,
+      mesh(cylinder(r), m),
     ];
-    const jointSpecs: [Particle, number, THREE.Material][] = [
-      [b.pelvis, 0.17, pants],
-      [b.neck, 0.17, shirt],
-      [b.lElbow, 0.06, shirt],
-      [b.rElbow, 0.06, shirt],
-      [b.lKnee, 0.08, pants],
-      [b.rKnee, 0.08, pants],
-      [b.lHand, 0.065, skin],
-      [b.rHand, 0.065, skin],
-      [b.lFoot, 0.09, pants],
-      [b.rFoot, 0.09, pants],
+    this.limbs = [
+      limb('neck', 'pelvis', 0.17, shirt),
+      limb('neck', 'lElbow', 0.06, shirt),
+      limb('lElbow', 'lHand', 0.05, skin),
+      limb('neck', 'rElbow', 0.06, shirt),
+      limb('rElbow', 'rHand', 0.05, skin),
+      limb('pelvis', 'lKnee', 0.08, pants),
+      limb('lKnee', 'lFoot', 0.07, pants),
+      limb('pelvis', 'rKnee', 0.08, pants),
+      limb('rKnee', 'rFoot', 0.07, pants),
+    ];
+    const jointGeo = this.track(this.geometries, new THREE.SphereGeometry(1, 8, 6));
+    const jointSpecs: [BodyPart, number, THREE.Material][] = [
+      ['pelvis', 0.17, pants],
+      ['neck', 0.17, shirt],
+      ['lElbow', 0.06, shirt],
+      ['rElbow', 0.06, shirt],
+      ['lKnee', 0.08, pants],
+      ['rKnee', 0.08, pants],
+      ['lHand', 0.065, skin],
+      ['rHand', 0.065, skin],
+      ['lFoot', 0.09, pants],
+      ['rFoot', 0.09, pants],
     ];
     this.joints = jointSpecs.map(([p, r, m]) => {
-      const j = add(new THREE.Mesh(this.jointGeo, m));
+      const j = mesh(jointGeo, m);
       j.scale.setScalar(r);
       return [p, j];
     });
-    this.headMesh = add(new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), skin));
-    this.hairMesh = add(
-      new THREE.Mesh(
+    this.headMesh = mesh(this.track(this.geometries, new THREE.SphereGeometry(0.16, 12, 10)), skin);
+    this.hairMesh = mesh(
+      this.track(
+        this.geometries,
         new THREE.SphereGeometry(0.165, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
-        new THREE.MeshLambertMaterial({ color: 0x5a3a1e }),
       ),
+      hairMat,
     );
-    this.leashSegs = [];
-    for (let i = 0; i < rag.rope.length - 1; i++) {
-      this.leashSegs.push(limb(0.022, this.leashMat));
+    for (let i = 0; i < RAGDOLL.ropeSegments; i++) {
+      this.leashSegs.push(mesh(cylinder(0.022), leashMat));
     }
-    this.shadow = new THREE.Group();
-    blobShadow(this.shadow, 0.5);
-    add(this.shadow);
+    const shadow = blobShadow(this.shadow, 0.5);
+    this.track(this.geometries, shadow.geometry);
+    this.track(this.materials, shadow.material as THREE.Material);
+    this.root.add(this.shadow);
+    scene.add(this.root);
+  }
+
+  private track<U, T extends U>(list: U[], item: T): T {
+    list.push(item);
+    return item;
+  }
+
+  /** Binds the view to a (new) ragdoll. */
+  bind(rag: Ragdoll): void {
+    this.rag = rag;
   }
 
   sync(): void {
     const rag = this.rag;
-    if (!rag || !this.headMesh || !this.hairMesh || !this.shadow) {
+    if (!rag) {
       return;
     }
-    for (const [a, b, m] of this.limbs) {
-      placeLimb(m, a, b);
+    const b = rag.body;
+    for (const [a, c, m] of this.limbs) {
+      placeLimb(m, b[a], b[c]);
     }
     for (const [p, m] of this.joints) {
-      m.position.set(p.x, p.y, p.z);
+      m.position.set(b[p].x, b[p].y, b[p].z);
     }
-    const h = rag.body.head;
-    const n = rag.body.neck;
+    const h = b.head;
+    const n = b.neck;
     this.headMesh.position.set(h.x, h.y, h.z);
     this.hairMesh.position.set(h.x, h.y + 0.01, h.z);
     tmpV.set(h.x - n.x, h.y - n.y, h.z - n.z).normalize();
     this.hairMesh.quaternion.setFromUnitVectors(UP, tmpV);
-    for (let i = 0; i < this.leashSegs.length; i++) {
+    const segs = Math.min(this.leashSegs.length, rag.rope.length - 1);
+    for (let i = 0; i < segs; i++) {
       placeLimb(this.leashSegs[i]!, rag.rope[i]!, rag.rope[i + 1]!);
     }
-    this.shadow.position.set(rag.body.pelvis.x, 0, rag.body.pelvis.z);
+    this.shadow.position.set(b.pelvis.x, 0, b.pelvis.z);
+  }
+
+  /** Removes the person from the scene and frees its GPU resources. */
+  dispose(): void {
+    this.scene.remove(this.root);
+    for (const g of this.geometries) {
+      g.dispose();
+    }
+    for (const m of this.materials) {
+      m.dispose();
+    }
+    this.rag = null;
   }
 }
 
