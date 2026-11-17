@@ -41,7 +41,9 @@ Live: <https://theraccoonbear.github.io/FunBunRun/>
 
 ## Status
 
-The game is currently a single-file three.js (r128) prototype in `index.html`. A TypeScript port is in progress; see [issue #1](https://github.com/theraccoonbear/FunBunRun/issues/1).
+The game is written in TypeScript with three.js; see `CLAUDE.md` for the module layout and [issue #1](https://github.com/theraccoonbear/FunBunRun/issues/1) for the port from the original prototype.
+
+The original single-file prototype is still published for side-by-side comparison: <https://theraccoonbear.github.io/FunBunRun/legacy/> (and at `/legacy/` on every PR preview). It will be removed once parity is confirmed.
 
 Bugs and ideas: [issues](https://github.com/theraccoonbear/FunBunRun/issues).
 
@@ -54,8 +56,10 @@ npm ci
 npm run dev          # dev server
 npm run check        # typecheck, lint, format check, unit tests
 npm run build        # production build into dist/
-npm run test:e2e     # Playwright smoke test (run `npx playwright install chromium` once)
+npm run test:e2e     # Playwright tests (run `npx playwright install chromium` once)
 ```
+
+Appending `?debug` to the game URL exposes a read-only `window.__fbr.snapshot()` with the current game state, for tests and debugging.
 
 Every pull request gets a live preview at `https://theraccoonbear.github.io/FunBunRun/pr-N/` (N is the PR number), posted as a comment by the preview workflow. Previews are removed when the PR closes. See `CLAUDE.md` for branch and review conventions.
 
