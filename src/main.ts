@@ -1,4 +1,4 @@
-import { BUNNY, INPUT, SIM } from './config';
+import { BUNNY, INPUT, ONBOARDING_ROUNDS, SIM } from './config';
 import { startLoop } from './core/loop';
 import { mathRandomRng, parseSeed } from './core/rng';
 import { createSfx } from './audio/sfx';
@@ -9,7 +9,7 @@ import { Keyboard } from './input/keyboard';
 import { attachPointer, releasePointer } from './input/pointer';
 import { detectTouch, TouchControls } from './input/touch';
 import { attachDeviceDetection, InputDeviceTracker, padHasInput } from './input/device';
-import { loadBest, localStore, saveBest } from './platform/storage';
+import { loadBest, loadRounds, localStore, saveBest, saveRounds } from './platform/storage';
 import { followCamera, menuCamera } from './render/camera';
 import { Hearts, TrailView, updateSniffAtmosphere } from './render/fx';
 import { disposeProps, makeProps } from './render/models';
@@ -20,6 +20,7 @@ import { SimRunner } from './sim/runner';
 import { formatClock } from './sim/rules';
 import { $, Hud } from './ui/hud';
 import { Menu } from './ui/menu';
+import { TouchHints, touchHintsVisible } from './ui/touch-hints';
 
 configureColorPipeline();
 
@@ -72,15 +73,26 @@ function startGame(): void {
 }
 
 /** Touch buttons and hints follow the last-used device; the touch zones stay live during a round. */
+const touchHints = new TouchHints($('touchHints'));
+let roundsDone = loadRounds(store);
+
 function syncTouchUi(): void {
   touch.setVisible(isPlaying(), isPlaying() && devices.isTouch);
+  touchHints.setVisible(
+    touchHintsVisible({
+      touch: devices.isTouch,
+      playing: isPlaying(),
+      roundsDone,
+      onboardingRounds: ONBOARDING_ROUNDS,
+    }),
+  );
   menu.setTouch(devices.isTouch);
   document.body.dataset.input = devices.device;
 }
 devices.onChange(syncTouchUi);
 
 function showMenu(summary: Parameters<Menu['show']>[0]): void {
-  touch.setVisible(false, false);
+  syncTouchUi();
   releasePointer();
   menu.show(summary);
 }
@@ -118,6 +130,8 @@ game.events.on('roundOver', (r) => {
   if (r.bestChanged) {
     saveBest(store, r.best);
   }
+  roundsDone += 1;
+  saveRounds(store, roundsDone);
   showMenu(r);
 });
 
@@ -132,6 +146,7 @@ const padEdges = new EdgeDetector();
 function frame(dt: number): void {
   keyboard.apply();
   touch.apply();
+  touchHints.setActive(touch.joystickActive, touch.lookActive);
   const pads = readGamepads();
   if (padHasInput(pads, INPUT.gamepadDeadzone)) {
     devices.note('gamepad');

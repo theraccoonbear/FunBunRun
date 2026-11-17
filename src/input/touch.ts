@@ -52,6 +52,16 @@ export class TouchControls {
     );
   }
 
+  /** A finger is currently driving the joystick. */
+  get joystickActive(): boolean {
+    return this.joyId !== null;
+  }
+
+  /** A finger is currently dragging the camera. */
+  get lookActive(): boolean {
+    return this.lookId !== null;
+  }
+
   /**
    * Shows or hides the touch layer (the joystick and camera zones; on while a
    * round runs, whatever the last-used device) and, separately, the buttons
