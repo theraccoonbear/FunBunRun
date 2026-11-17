@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { LEASH_LENGTH, ROUND_SECONDS, RULES, YANK_MESSAGES } from '../../src/config';
+import { CAMERA, LEASH_LENGTH, ROUND_SECONDS, RULES, YANK_MESSAGES } from '../../src/config';
 import { createRng } from '../../src/core/rng';
-import { Game, type FrameInput, type GameEvents } from '../../src/sim/game';
+import { Game, type StepInput, type GameEvents } from '../../src/sim/game';
 
 const DT = 1 / 60;
-const idle: FrameInput = {
+const idle: StepInput = {
   moveX: 0,
   moveY: 0,
   lookX: 0,
@@ -188,14 +188,21 @@ describe('Game', () => {
     expect(g.scent.drops.every((d) => d.age > 12)).toBe(true);
   });
 
-  it('starts each round with no leftover physics time', () => {
+  it('steps the person once per update, so the collar speed is per step (#2)', () => {
     const g = newGame();
     g.start();
-    g.update(0.01, idle);
-    expect(g.physics.pending).toBeCloseTo(0.01);
-    g.session.phase = 'over';
+    g.update(DT, { ...idle, moveY: 1 });
+    expect(g.rag.st.lc).toEqual({ x: g.collar.x, z: g.collar.z });
+    g.update(DT, { ...idle, moveY: 1 });
+    expect(g.rag.st.lc).toEqual({ x: g.collar.x, z: g.collar.z });
+  });
+
+  it('tracks the camera yaw the movement basis used', () => {
+    const g = newGame();
     g.start();
-    expect(g.physics.pending).toBe(0);
+    expect(g.camYaw).toBe(0);
+    g.update(DT, { ...idle, lookX: -100 });
+    expect(g.camYaw).toBeCloseTo(100 * CAMERA.yawPerPixel);
   });
 
   it('drops scent behind the bunny every quarter second', () => {

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { SIM } from '../../src/config';
 import { FixedStepper, FrameTimer, startLoop } from '../../src/core/loop';
 
 describe('FixedStepper', () => {
@@ -24,11 +25,37 @@ describe('FixedStepper', () => {
     expect(s.pending).toBeCloseTo(0.005);
   });
 
-  it('never needs the cap at the game settings (1/60 s steps, 4 max, dt <= 0.05)', () => {
-    const s = new FixedStepper(1 / 60, 4);
-    for (let i = 0; i < 1000; i++) {
-      expect(s.advance(0.05, () => {})).toBeLessThanOrEqual(3);
+  it('keeps full speed down to 15 fps at the game settings', () => {
+    const s = new FixedStepper(SIM.step, SIM.maxStepsPerFrame);
+    let steps = 0;
+    // 10 s at 15.5 fps: every owed step runs, none is dropped.
+    const dt = 1 / 15.5;
+    for (let i = 0; i < 155; i++) {
+      steps += s.advance(dt, () => {});
     }
+    expect(steps).toBeGreaterThanOrEqual(599);
+    expect(steps).toBeLessThanOrEqual(600);
+  });
+
+  it('drops time only below 15 fps, at most maxSteps per frame', () => {
+    const s = new FixedStepper(SIM.step, SIM.maxStepsPerFrame);
+    let steps = 0;
+    // 10 s at 10 fps: 4 steps per frame, so the game runs at 40/60 speed.
+    for (let i = 0; i < 100; i++) {
+      const n = s.advance(0.1, () => {});
+      expect(n).toBe(SIM.maxStepsPerFrame);
+      steps += n;
+    }
+    expect(steps).toBe(400);
+  });
+
+  it('reports the interpolation factor as the owed fraction of a step', () => {
+    const s = new FixedStepper(0.01, 4);
+    expect(s.alpha).toBe(0);
+    s.advance(0.0125, () => {});
+    expect(s.alpha).toBeCloseTo(0.25);
+    s.advance(0.005, () => {});
+    expect(s.alpha).toBeCloseTo(0.75);
   });
 
   it('reset() drops pending time', () => {

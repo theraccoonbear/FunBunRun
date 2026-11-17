@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { FX, RAGDOLL, RULES } from '../config';
-import type { BunnyState } from '../sim/bunny';
 import type { DogState } from '../sim/dog';
 import type { Bone } from '../sim/game';
-import type { BodyPart, Particle, Ragdoll } from '../sim/ragdoll';
+import type { BunnyRender, DogRender } from '../sim/interp';
+import type { BodyPart, Ragdoll } from '../sim/ragdoll';
 import {
   blobShadow,
   boneMaterial,
@@ -14,7 +14,7 @@ import {
   type DogModel,
 } from './models';
 
-/** Syncs the dog model to the sim pose and runs the procedural gallop, tail, ears and lick. */
+/** Syncs the dog model to the (interpolated) sim pose and runs the procedural gallop, tail, ears and lick. */
 export class DogView {
   readonly model: DogModel = makeDog();
 
@@ -28,29 +28,29 @@ export class DogView {
     this.model.root.rotation.y = d.pose.heading;
   }
 
-  /** `lickT` is the lick timer as it was when the dog moved this frame. */
-  sync(d: DogState, elapsed: number, lickT: number): void {
+  sync(p: DogRender, elapsed: number): void {
     const m = this.model;
-    const p = d.pose;
     const amp = p.amp;
-    this.place(d);
+    m.root.position.set(p.x, p.y, p.z);
+    m.root.rotation.y = p.heading;
     m.body.position.y = p.bodyY;
     m.body.rotation.x = p.pitch;
     const [l0, l1, l2, l3] = m.legs as [THREE.Group, THREE.Group, THREE.Group, THREE.Group];
-    if (!d.grounded) {
+    if (!p.grounded) {
       l0.rotation.x = l1.rotation.x = -0.9;
       l2.rotation.x = l3.rotation.x = 0.9;
     } else {
-      l0.rotation.x = Math.sin(d.ph) * 0.9 * amp;
-      l1.rotation.x = Math.sin(d.ph + 0.4) * 0.9 * amp;
-      l2.rotation.x = Math.sin(d.ph + 2.4) * 0.9 * amp;
-      l3.rotation.x = Math.sin(d.ph + 2.8) * 0.9 * amp;
+      l0.rotation.x = Math.sin(p.ph) * 0.9 * amp;
+      l1.rotation.x = Math.sin(p.ph + 0.4) * 0.9 * amp;
+      l2.rotation.x = Math.sin(p.ph + 2.4) * 0.9 * amp;
+      l3.rotation.x = Math.sin(p.ph + 2.8) * 0.9 * amp;
     }
     m.tail.rotation.y = Math.sin(elapsed * 14) * 0.6;
-    const ear = -Math.abs(Math.sin(d.ph)) * 0.6 * amp - (d.grounded ? 0 : 0.8);
+    const ear = -Math.abs(Math.sin(p.ph)) * 0.6 * amp - (p.grounded ? 0 : 0.8);
     for (const e of m.ears) {
       e.rotation.x = ear;
     }
+    const lickT = p.lickT;
     const ext = lickT > 0 ? Math.sin((1 - lickT / RULES.lickDuration) * Math.PI) : 0;
     m.head.position.z = 0.52 + ext * 0.12;
     m.head.rotation.x = ext * 0.25;
@@ -65,36 +65,45 @@ export class BunnyView {
     scene.add(this.model.outer);
   }
 
-  sync(b: BunnyState): void {
+  sync(b: BunnyRender): void {
     const m = this.model;
     const hy = Math.abs(Math.sin(b.hopT)) * (0.08 + b.spd * 0.04) + b.by;
-    m.outer.position.set(b.pos.x, 0, b.pos.z);
+    m.outer.position.set(b.x, 0, b.z);
     m.outer.rotation.y = b.h;
     m.inner.position.y = hy;
     m.inner.rotation.x = -Math.cos(b.hopT) * 0.15 * Math.min(1, b.spd / 5);
-    const earFlop = b.tired > 0 ? 0.9 : 0.15 + Math.sin(b.hopT) * 0.15;
+    const earFlop = b.tired ? 0.9 : 0.15 + Math.sin(b.hopT) * 0.15;
     for (const e of m.ears) {
       e.rotation.x = -earFlop;
     }
   }
 
   /** Menu pose: hopping on the spot at the start position, slowly turning. */
-  syncMenu(b: BunnyState, elapsed: number, x: number, z: number): void {
+  syncMenu(hopT: number, elapsed: number, x: number, z: number): void {
     const m = this.model;
     m.outer.position.set(x, 0, z);
     m.outer.rotation.y = elapsed * 0.5;
-    m.inner.position.y = Math.abs(Math.sin(b.hopT)) * 0.15;
+    m.inner.position.y = Math.abs(Math.sin(hopT)) * 0.15;
   }
 }
 
 const UP = new THREE.Vector3(0, 1, 0);
 const tmpV = new THREE.Vector3();
 
-/** Places a unit-height, y-aligned cylinder between two points. */
-function placeLimb(mesh: THREE.Object3D, a: Particle, b: Particle): void {
-  tmpV.set(b.x - a.x, b.y - a.y, b.z - a.z);
+/**
+ * Places a unit-height, y-aligned cylinder between points `a` and `b`, given
+ * as indices into a flat x, y, z position array.
+ */
+function placeLimb(mesh: THREE.Object3D, p: readonly number[], a: number, b: number): void {
+  const ax = p[a * 3]!;
+  const ay = p[a * 3 + 1]!;
+  const az = p[a * 3 + 2]!;
+  const bx = p[b * 3]!;
+  const by = p[b * 3 + 1]!;
+  const bz = p[b * 3 + 2]!;
+  tmpV.set(bx - ax, by - ay, bz - az);
   const len = tmpV.length();
-  mesh.position.set((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+  mesh.position.set((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2);
   if (len > 1e-5) {
     tmpV.multiplyScalar(1 / len);
     mesh.quaternion.setFromUnitVectors(UP, tmpV);
@@ -104,6 +113,9 @@ function placeLimb(mesh: THREE.Object3D, a: Particle, b: Particle): void {
 
 type Limb = [BodyPart, BodyPart, THREE.Mesh];
 type Joint = [BodyPart, THREE.Mesh];
+
+/** Index of each body part in `rag.pts`, resolved when a ragdoll is bound. */
+type PartIndex = Record<BodyPart, number>;
 
 /**
  * The person and the leash, drawn from the ragdoll particles. Meshes,
@@ -121,6 +133,9 @@ export class PersonView {
   private readonly hairMesh: THREE.Mesh;
   private readonly shadow = new THREE.Group();
   private rag: Ragdoll | null = null;
+  private part: PartIndex | null = null;
+  private ropeIdx: number[] = [];
+  private own: number[] = [];
 
   constructor(private readonly scene: THREE.Scene) {
     const mat = (color: number): THREE.MeshLambertMaterial =>
@@ -205,31 +220,59 @@ export class PersonView {
   /** Binds the view to a (new) ragdoll. */
   bind(rag: Ragdoll): void {
     this.rag = rag;
+    const part = {} as PartIndex;
+    for (const k of Object.keys(rag.body) as BodyPart[]) {
+      part[k] = rag.pts.indexOf(rag.body[k]);
+    }
+    this.part = part;
+    this.ropeIdx = rag.rope.map((p) => rag.pts.indexOf(p));
   }
 
-  sync(): void {
+  /**
+   * Draws the person and leash from `pts` (x, y, z per point in `rag.pts`
+   * order, as interpolated by the sim runner), or from the bound ragdoll's
+   * current particles when omitted.
+   */
+  sync(pts?: readonly number[]): void {
     const rag = this.rag;
-    if (!rag) {
+    const part = this.part;
+    if (!rag || !part) {
       return;
     }
-    const b = rag.body;
+    let p = pts;
+    if (!p) {
+      const own = this.own;
+      own.length = rag.pts.length * 3;
+      rag.pts.forEach((q, i) => {
+        own[i * 3] = q.x;
+        own[i * 3 + 1] = q.y;
+        own[i * 3 + 2] = q.z;
+      });
+      p = own;
+    }
     for (const [a, c, m] of this.limbs) {
-      placeLimb(m, b[a], b[c]);
+      placeLimb(m, p, part[a], part[c]);
     }
-    for (const [p, m] of this.joints) {
-      m.position.set(b[p].x, b[p].y, b[p].z);
+    for (const [j, m] of this.joints) {
+      const i = part[j] * 3;
+      m.position.set(p[i]!, p[i + 1]!, p[i + 2]);
     }
-    const h = b.head;
-    const n = b.neck;
-    this.headMesh.position.set(h.x, h.y, h.z);
-    this.hairMesh.position.set(h.x, h.y + 0.01, h.z);
-    tmpV.set(h.x - n.x, h.y - n.y, h.z - n.z).normalize();
+    const h = part.head * 3;
+    const n = part.neck * 3;
+    const hx = p[h]!;
+    const hy = p[h + 1]!;
+    const hz = p[h + 2]!;
+    this.headMesh.position.set(hx, hy, hz);
+    this.hairMesh.position.set(hx, hy + 0.01, hz);
+    tmpV.set(hx - p[n]!, hy - p[n + 1]!, hz - p[n + 2]!).normalize();
     this.hairMesh.quaternion.setFromUnitVectors(UP, tmpV);
-    const segs = Math.min(this.leashSegs.length, rag.rope.length - 1);
+    const rope = this.ropeIdx;
+    const segs = Math.min(this.leashSegs.length, rope.length - 1);
     for (let i = 0; i < segs; i++) {
-      placeLimb(this.leashSegs[i]!, rag.rope[i]!, rag.rope[i + 1]!);
+      placeLimb(this.leashSegs[i]!, p, rope[i]!, rope[i + 1]!);
     }
-    this.shadow.position.set(b.pelvis.x, 0, b.pelvis.z);
+    const pel = part.pelvis * 3;
+    this.shadow.position.set(p[pel]!, 0, p[pel + 2]);
   }
 
   /** Removes the person from the scene and frees its GPU resources. */
@@ -242,6 +285,7 @@ export class PersonView {
       m.dispose();
     }
     this.rag = null;
+    this.part = null;
   }
 }
 
@@ -263,13 +307,14 @@ export class BonesView {
     bones.forEach((b, i) => this.meshes[i]?.position.set(b.x, FX.boneHeight, b.z));
   }
 
-  sync(bones: readonly Bone[], elapsed: number): void {
+  /** `spins` are the interpolated spin angles; positions come from the bones. */
+  sync(bones: readonly Bone[], spins: readonly number[], elapsed: number): void {
     bones.forEach((b, i) => {
       const m = this.meshes[i];
       if (!m) {
         return;
       }
-      m.rotation.y = b.spin;
+      m.rotation.y = spins[i] ?? b.spin;
       m.position.set(
         b.x,
         FX.boneHeight + Math.sin(elapsed * FX.boneBobRate + b.x) * FX.boneBob,

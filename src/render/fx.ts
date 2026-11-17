@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { FX, SNIFF } from '../config';
+import { FX, SIM, SNIFF } from '../config';
+import { smoothing } from '../core/math';
 import type { Rng } from '../core/rng';
 import { scentOpacity, type ScentTrail } from '../sim/scent';
 import type { SceneKit } from './scene';
@@ -92,7 +93,8 @@ export class Hearts {
 
 /** Sniff mode: the sky darkens to purple and the fog closes in. */
 export function updateSniffAtmosphere(kit: SceneKit, sniffing: boolean, dt: number): void {
-  const k = Math.min(1, dt * SNIFF.blendRate);
+  // Tuned per 60 Hz frame; the same blend per second at any refresh rate.
+  const k = smoothing(SNIFF.blendRate, dt, SIM.step);
   kit.background.lerp(sniffing ? kit.sniffSky : kit.sky, k);
   kit.fog.color.copy(kit.background);
   kit.fog.far += ((sniffing ? SNIFF.fogFar : SNIFF.normalFogFar) - kit.fog.far) * k;

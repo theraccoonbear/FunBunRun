@@ -9,8 +9,26 @@ export const ARENA_HALF = 98;
 export const ROUND_SECONDS = 90;
 /** Leash length in metres (rope rest length and hard limit). */
 export const LEASH_LENGTH = 3.6;
-/** Upper bound on a frame's dt, in seconds (see #3 before changing). */
-export const MAX_FRAME_DT = 0.05;
+
+/**
+ * Simulation clock (#3). The whole simulation (dog, bunny, person and leash,
+ * rules) advances in fixed steps; rendering interpolates between the last two
+ * steps.
+ *
+ * Time-drop policy: each rendered frame runs at most `maxStepsPerFrame`
+ * steps. If more time than that is owed after a frame, the backlog is dropped
+ * instead of being caught up later, so a slow frame cannot snowball into ever
+ * slower frames. With 60 Hz steps and 4 steps per frame, the game runs at
+ * full speed down to 15 fps and only slows below that. Gaps longer than
+ * `maxFrameDt` (tab switches, debugger pauses) count as `maxFrameDt`; that
+ * clamp also bounds per-frame visual effects.
+ */
+export const SIM = {
+  /** Fixed step in seconds. Tuning constants below assume 60 Hz. */
+  step: 1 / 60,
+  maxStepsPerFrame: 4,
+  maxFrameDt: 0.25,
+} as const;
 
 export const WORLD = {
   /** Spawn-clear radius around the origin where no prop is placed. */
@@ -150,9 +168,6 @@ export const RAGDOLL = {
   ropeInvMass: 0.6,
   ropeRadius: 0.03,
   solverIterations: 10,
-  /** Fixed physics step and the cap on steps per frame. */
-  step: 1 / 60,
-  maxStepsPerFrame: 4,
   /** Recovery: seconds of negative stun needed for full standing control. */
   recoverTime: 1.2,
   walkSpeed: 3.2,
@@ -163,7 +178,10 @@ export const RAGDOLL = {
   swingDecay: 0.9,
   poseStrength: 0.15,
   poseDamping: 0.5,
-  /** Collar speed (m/s) above which leash pull can stun or yank. */
+  /**
+   * Collar speed (m/s) above which leash pull can stun or yank. Measured from
+   * the collar's displacement over one sim step, so it is frame-rate independent (#2).
+   */
   yankCollarSpeed: 3.5,
   stunPull: 0.004,
   stunTime: 0.9,

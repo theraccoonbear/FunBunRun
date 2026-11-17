@@ -3,23 +3,33 @@ import { Actions, EdgeDetector } from '../../src/input/actions';
 import { Keyboard } from '../../src/input/keyboard';
 
 describe('Actions', () => {
-  it('latches edge actions until the end of the frame', () => {
+  it('latches edge actions until a step takes them, then only once', () => {
     const a = new Actions();
     a.press('lick');
     a.press('lick');
     expect(a.lick).toBe(true);
     expect(a.jump).toBe(false);
-    a.endFrame();
+    expect(a.take()).toMatchObject({ lick: true, jump: false });
     expect(a.lick).toBe(false);
+    expect(a.take().lick).toBe(false);
   });
 
-  it('accumulates look deltas between frames and clears them after', () => {
+  it('accumulates look deltas until a step takes them', () => {
     const a = new Actions();
     a.addLook(3, 1);
     a.addLook(2, -4);
     expect([a.lookX, a.lookY]).toEqual([5, -3]);
-    a.endFrame();
+    expect(a.take()).toMatchObject({ lookX: 5, lookY: -3 });
     expect([a.lookX, a.lookY]).toEqual([0, 0]);
+    expect(a.take()).toMatchObject({ lookX: 0, lookY: 0 });
+  });
+
+  it('gives every step the held state', () => {
+    const a = new Actions();
+    Object.assign(a, { moveX: 0.5, moveY: -1, turn: 1, sprint: true });
+    for (let i = 0; i < 3; i++) {
+      expect(a.take()).toMatchObject({ moveX: 0.5, moveY: -1, turn: 1, sprint: true });
+    }
   });
 });
 
@@ -68,13 +78,13 @@ describe('Keyboard', () => {
     const { a, kb } = setup();
     kb.down('Space');
     expect(a.jump).toBe(true);
-    a.endFrame();
+    a.take();
     kb.down('Space'); // auto-repeat
     expect(a.jump).toBe(false);
     kb.up('Space');
     kb.down('KeyE');
     expect(a.lick).toBe(true);
-    a.endFrame();
+    a.take();
     kb.down('KeyF');
     expect(a.lick).toBe(true);
   });

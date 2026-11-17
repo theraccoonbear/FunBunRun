@@ -1,6 +1,5 @@
 import { FX, LEASH_LENGTH, RAGDOLL, RULES, WORLD, YANK_MESSAGES } from '../config';
 import { Emitter } from '../core/events';
-import { FixedStepper } from '../core/loop';
 import type { Vec3 } from '../core/math';
 import { mathRandomRng, type Rng } from '../core/rng';
 import {
@@ -27,18 +26,18 @@ import { canPickBone, createReach, lickReach, type LickReach } from './rules';
 import { ageScent, clearScentTrail, createScentTrail, dropScent, type ScentTrail } from './scent';
 import { freeSpot, generateWorld, type World } from './world';
 
-/** Per-frame input, already merged from every device. */
-export interface FrameInput {
+/** Input for one simulation step, already merged from every device. */
+export interface StepInput {
   /** Movement stick, x right and y forward, each roughly -1..1. */
   moveX: number;
   moveY: number;
-  /** Look deltas in pixels (or equivalent) this frame. */
+  /** Look deltas in pixels (or equivalent) since the previous step. */
   lookX: number;
   lookY: number;
   /** Key turning, -1..1, positive turns left. */
   turn: number;
   sprint: boolean;
-  /** Edge-triggered this frame. */
+  /** Edge-triggered: true on exactly one step per press. */
   jump: boolean;
   lick: boolean;
 }
@@ -81,16 +80,19 @@ export class Game {
   readonly bones: Bone[] = [];
   readonly scent: ScentTrail = createScentTrail();
   readonly reach: LickReach = createReach();
-  /** Camera-relative basis used for movement this frame. */
+  /** Camera-relative basis used for movement in the last step. */
   readonly basis: Basis = { fx: 0, fz: -1, rx: 1, rz: 0 };
-  /** Collar (leash anchor) world position at the last physics update. */
+  /** Collar (leash anchor) world position at the last step. */
   readonly collar: Vec3 = { x: 0, y: 0, z: 0 };
   rag: Ragdoll;
   sprinting = false;
-  /** Lick timer as it was when the dog moved this frame (drives the head and tongue pose). */
+  /**
+   * Camera yaw the movement basis was built from in the last step (before
+   * auto-follow nudges the look), which is the yaw the camera shows.
+   */
+  camYaw = 0;
+  /** Lick timer as it was when the dog moved in the last step (drives the head and tongue pose). */
   dogLickT = 0;
-  /** Fixed-step clock for the person and leash physics. */
-  readonly physics = new FixedStepper(RAGDOLL.step, RAGDOLL.maxStepsPerFrame);
   private readonly ragCollide = (p: Particle): void =>
     collide(this.world.obstacles, this.world.half, p, p.r, 0);
 
@@ -116,10 +118,9 @@ export class Game {
     }
     resetDog(this.dog);
     resetLook(this.look);
+    this.camYaw = this.look.yaw;
     resetBunny(this.bunny);
     this.rag = this.buildPerson();
-    // Leftover time from the previous round must not step the new ragdoll.
-    this.physics.reset();
     clearScentTrail(this.scent);
     this.events.emit('start', undefined);
     return true;
@@ -135,7 +136,12 @@ export class Game {
     });
   }
 
-  update(dt: number, input: FrameInput): void {
+  /**
+   * Advances the whole simulation by one step of `dt` seconds. The game loop
+   * always passes the fixed step (SIM.step) through a SimRunner, so results do
+   * not depend on the frame rate.
+   */
+  update(dt: number, input: StepInput): void {
     const s = this.session;
     s.elapsed += dt;
     if (s.phase === 'play') {
@@ -146,7 +152,7 @@ export class Game {
     s.lickT = Math.max(0, s.lickT - dt);
   }
 
-  private updatePlay(dt: number, input: FrameInput): void {
+  private updatePlay(dt: number, input: StepInput): void {
     const s = this.session;
     const d = this.dog;
     const b = this.bunny;
@@ -169,6 +175,7 @@ export class Game {
       this.basis,
     );
     this.sprinting = res.sprinting;
+    this.camYaw = Math.atan2(-this.basis.fx, -this.basis.fz);
     this.dogLickT = s.lickT;
     if (res.jumped) {
       this.events.emit('jump', undefined);
@@ -192,9 +199,11 @@ export class Game {
       }
     }
 
-    // Person and leash physics at a fixed 60 Hz, anchored to the posed collar
+    // Person and leash physics, anchored to the posed collar. One ragdoll step
+    // per dog step, so the collar speed the yank check sees is the true
+    // per-step speed at any frame rate (#2).
     collarWorld(d.pose, this.collar);
-    this.physics.advance(dt, (h) => this.rag.step(h, this.collar, this.ragCollide));
+    this.rag.step(dt, this.collar, this.ragCollide);
     if (this.rag.st.yanked) {
       this.rag.st.yanked = false;
       this.events.emit('yank', { message: this.rng.pick(YANK_MESSAGES) });
