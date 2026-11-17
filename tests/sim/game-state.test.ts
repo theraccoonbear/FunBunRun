@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { ROUND_SECONDS, RULES } from '../../src/config';
-import { createSession, scoreLick, startRound, tickClock } from '../../src/sim/game-state';
+import {
+  createSession,
+  pauseRound,
+  quitRound,
+  resumeRound,
+  scoreLick,
+  startRound,
+  tickClock,
+} from '../../src/sim/game-state';
 
 describe('session', () => {
   it('starts in the menu with the stored best', () => {
@@ -87,5 +95,59 @@ describe('session', () => {
     s.elapsed = 20;
     expect(scoreLick(s)).toBe(100);
     expect(s).toMatchObject({ score: 400, licks: 3, combo: 1, lastLick: 20 });
+  });
+
+  it('play -> paused -> play keeps the round and freezes the clock', () => {
+    const s = createSession(0);
+    startRound(s);
+    tickClock(s, 10);
+    s.score = 300;
+    expect(pauseRound(s)).toBe(true);
+    expect(s.phase).toBe('paused');
+    expect(tickClock(s, 50)).toBeNull();
+    expect(s.timeLeft).toBe(ROUND_SECONDS - 10);
+    expect(resumeRound(s)).toBe(true);
+    expect(s).toMatchObject({ phase: 'play', timeLeft: ROUND_SECONDS - 10, score: 300 });
+  });
+
+  it('only pauses during play and only resumes or quits while paused', () => {
+    const s = createSession(0);
+    expect(pauseRound(s)).toBe(false);
+    expect(resumeRound(s)).toBe(false);
+    expect(quitRound(s)).toBe(false);
+    expect(s.phase).toBe('menu');
+    startRound(s);
+    expect(resumeRound(s)).toBe(false);
+    expect(quitRound(s)).toBe(false);
+    pauseRound(s);
+    expect(pauseRound(s)).toBe(false);
+    expect(s.phase).toBe('paused');
+    tickClock(s, ROUND_SECONDS);
+    expect(s.phase).toBe('paused');
+    // A finished round cannot be paused.
+    resumeRound(s);
+    tickClock(s, ROUND_SECONDS);
+    expect(s.phase).toBe('over');
+    expect(pauseRound(s)).toBe(false);
+  });
+
+  it('paused -> menu abandons the round without touching the best', () => {
+    const s = createSession(100);
+    startRound(s);
+    s.score = 500;
+    pauseRound(s);
+    expect(quitRound(s)).toBe(true);
+    expect(s.phase).toBe('menu');
+    expect(s.best).toBe(100);
+  });
+
+  it('paused -> play via restart starts a fresh round', () => {
+    const s = createSession(0);
+    startRound(s);
+    tickClock(s, 30);
+    s.score = 200;
+    pauseRound(s);
+    expect(startRound(s)).toBe(true);
+    expect(s).toMatchObject({ phase: 'play', timeLeft: ROUND_SECONDS, score: 0 });
   });
 });

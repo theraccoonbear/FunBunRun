@@ -14,6 +14,9 @@ import { collide } from './collision';
 import { collarWorld, createDog, resetDog, updateDog, type DogState } from './dog';
 import {
   createSession,
+  pauseRound,
+  quitRound,
+  resumeRound,
   scoreLick,
   startRound,
   tickClock,
@@ -44,6 +47,12 @@ export interface StepInput {
 
 export interface GameEvents extends Record<string, unknown> {
   start: undefined;
+  /** play -> paused: the sim and the round clock stop until resume or quit. */
+  pause: undefined;
+  /** paused -> play. */
+  resume: undefined;
+  /** paused -> menu: the round was abandoned. */
+  quit: undefined;
   jump: undefined;
   lick: { points: number; combo: number; x: number; z: number };
   miss: undefined;
@@ -167,6 +176,33 @@ export class Game {
     return true;
   }
 
+  /** Pauses a running round. Returns false outside play. */
+  pause(): boolean {
+    if (!pauseRound(this.session)) {
+      return false;
+    }
+    this.events.emit('pause', undefined);
+    return true;
+  }
+
+  /** Resumes a paused round where it stopped. Returns false when not paused. */
+  resume(): boolean {
+    if (!resumeRound(this.session)) {
+      return false;
+    }
+    this.events.emit('resume', undefined);
+    return true;
+  }
+
+  /** Abandons a paused round and returns to the menu. Returns false when not paused. */
+  quit(): boolean {
+    if (!quitRound(this.session)) {
+      return false;
+    }
+    this.events.emit('quit', undefined);
+    return true;
+  }
+
   private buildPerson(): Ragdoll {
     collarWorld(this.dog.pose, this.collar);
     return makeRagdollSim({
@@ -180,10 +216,13 @@ export class Game {
   /**
    * Advances the whole simulation by one step of `dt` seconds. The game loop
    * always passes the fixed step (SIM.step) through a SimRunner, so results do
-   * not depend on the frame rate.
+   * not depend on the frame rate. Does nothing while paused.
    */
   update(dt: number, input: StepInput): void {
     const s = this.session;
+    if (s.phase === 'paused') {
+      return;
+    }
     s.elapsed += dt;
     if (s.phase === 'play') {
       this.updatePlay(dt, input);

@@ -36,10 +36,20 @@ export class SimRunner {
     this.resync();
     // A new round teleports everything; do not blend from the old round.
     game.events.on('start', () => this.resync());
+    // Paused frames are discarded (see frame()); also drop any partial step
+    // owed from before the pause so resuming never starts with a backlog.
+    game.events.on('resume', () => this.stepper.reset());
   }
 
-  /** Feeds one frame's elapsed time and runs the steps due. Returns the step count. */
+  /**
+   * Feeds one frame's elapsed time and runs the steps due. Returns the step
+   * count. While the game is paused the time is discarded, not accumulated,
+   * so resuming does not replay the paused wall-clock time as a burst of steps.
+   */
   frame(dt: number, input: StepInputSource): number {
+    if (this.game.phase === 'paused') {
+      return 0;
+    }
     return this.stepper.advance(dt, (h) => {
       const t = this.ticks * h;
       const done = this.prev;

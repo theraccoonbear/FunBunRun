@@ -5,6 +5,10 @@ type Webkit = typeof window & { webkitAudioContext?: typeof AudioContext };
 export interface Sfx {
   /** Creates or resumes the audio context; call from a user gesture. */
   init(): void;
+  /** Suspends the audio context (pause). */
+  suspend(): void;
+  /** Resumes the audio context after suspend(). */
+  resume(): void;
   slurp(): void;
   miss(): void;
   bone(): void;
@@ -47,6 +51,12 @@ export function createSfx(): Sfx {
       } catch {
         ac = null;
       }
+    },
+    suspend() {
+      void ac?.suspend?.().catch(() => {});
+    },
+    resume() {
+      void ac?.resume?.().catch(() => {});
     },
     slurp() {
       tone('sawtooth', 520, 130, 0.3, 0.25);

@@ -3,9 +3,11 @@ import type { Actions } from './actions';
 const PREVENT_DEFAULT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 
 export interface KeyboardHooks {
-  /** Called on Enter when no round is running. */
+  /** Called on Enter when no round is running (also confirms the pause menu). */
   onStart: () => void;
   isPlaying: () => boolean;
+  /** Called on a fresh press of Esc or P. */
+  onPause?: (code: 'Escape' | 'KeyP') => void;
 }
 
 /** Tracks held keys and maps them to actions. */
@@ -23,6 +25,7 @@ export class Keyboard {
 
   /** Handles a key press; returns true when the browser default should be suppressed. */
   down(code: string): boolean {
+    let prevent = PREVENT_DEFAULT.has(code);
     if (!this.isDown(code)) {
       if (code === 'Space') {
         this.actions.press('jump');
@@ -32,10 +35,15 @@ export class Keyboard {
       }
       if (code === 'Enter' && !this.hooks.isPlaying()) {
         this.hooks.onStart();
+        // The hook handles Enter; a focused menu button must not also click.
+        prevent = true;
+      }
+      if (code === 'Escape' || code === 'KeyP') {
+        this.hooks.onPause?.(code);
       }
     }
     this.keys.set(code, true);
-    return PREVENT_DEFAULT.has(code);
+    return prevent;
   }
 
   up(code: string): void {

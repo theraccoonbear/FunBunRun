@@ -10,7 +10,13 @@ export interface PadLike {
 
 export interface GamepadHooks {
   isPlaying: () => boolean;
+  /** A or Start outside play (starts a round, or confirms the pause menu). */
   onStart: () => void;
+  isPaused?: () => boolean;
+  /** Start during play or pause: toggles pause. */
+  onPause?: () => void;
+  /** D-pad up (-1) or down (+1) outside play: moves the menu focus. */
+  onNav?: (dir: -1 | 1) => void;
 }
 
 /** Standard-mapping button indices. */
@@ -23,6 +29,8 @@ export const PAD = {
   rt: 7,
   start: 9,
   l3: 10,
+  up: 12,
+  down: 13,
 } as const;
 
 const deadzone = (v: number): number => (Math.abs(v) < INPUT.gamepadDeadzone ? 0 : v);
@@ -61,8 +69,23 @@ export function pollGamepads(
     if (lickX || lickRT) {
       actions.press('lick');
     }
-    if (edge(PAD.start) && !hooks.isPlaying()) {
-      hooks.onStart();
+    if (edge(PAD.start)) {
+      if (hooks.onPause && (hooks.isPlaying() || hooks.isPaused?.())) {
+        hooks.onPause();
+      } else if (!hooks.isPlaying()) {
+        hooks.onStart();
+      }
+    }
+    // Evaluate both edges every poll so neither repeats later.
+    const up = edge(PAD.up);
+    const down = edge(PAD.down);
+    if (!hooks.isPlaying() && hooks.onNav) {
+      if (up) {
+        hooks.onNav(-1);
+      }
+      if (down) {
+        hooks.onNav(1);
+      }
     }
     if (pressed(PAD.b) || pressed(PAD.lt)) {
       actions.sniff = true;

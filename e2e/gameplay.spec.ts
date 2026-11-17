@@ -57,3 +57,35 @@ test('keyboard input runs and jumps the dog and the leash holds', async ({ page 
 
   expect(errors).toEqual([]);
 });
+
+test('Esc pauses the round: the overlay shows and the clock stops until resume', async ({
+  page,
+}) => {
+  const errors: Error[] = [];
+  page.on('pageerror', (err) => errors.push(err));
+  await page.goto('./?debug');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#overlay')).toBeHidden();
+  await expect(page.locator('#tTime')).not.toHaveText('1:30');
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#pause')).toBeVisible();
+  await expect(page.locator('#pause button').first()).toBeFocused();
+  const paused = await page.evaluate(snapshot);
+  expect(paused.phase).toBe('paused');
+  const clock = await page.locator('#tTime').textContent();
+
+  await page.waitForTimeout(2200);
+  await expect(page.locator('#tTime')).toHaveText(clock ?? '');
+  expect((await page.evaluate(snapshot)).timeLeft).toBe(paused.timeLeft);
+
+  await page.locator('#pause button', { hasText: 'Resume' }).click();
+  await expect(page.locator('#pause')).toBeHidden();
+  expect((await page.evaluate(snapshot)).phase).toBe('play');
+  await expect
+    .poll(async () => (await page.evaluate(snapshot)).timeLeft)
+    .toBeLessThan(paused.timeLeft);
+  // No catch-up burst: the clock resumes from where it stopped.
+  expect((await page.evaluate(snapshot)).timeLeft).toBeGreaterThan(paused.timeLeft - 1);
+  expect(errors).toEqual([]);
+});

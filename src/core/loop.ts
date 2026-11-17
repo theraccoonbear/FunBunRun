@@ -60,10 +60,21 @@ export class FrameTimer {
     this.last = t;
     return Math.min(this.maxDt, dt);
   }
+
+  /** Forgets the last frame time, so the next tick() returns 0 (after a pause or suspend). */
+  reset(): void {
+    this.last = null;
+  }
 }
 
-/** Starts a requestAnimationFrame loop. Returns a function that stops it. */
-export function startLoop(frame: (dt: number) => void, maxDt: number): () => void {
+export interface LoopHandle {
+  stop(): void;
+  /** Makes the next frame's dt 0, so time spent paused or suspended is never fed to the game. */
+  resetClock(): void;
+}
+
+/** Starts a requestAnimationFrame loop. */
+export function startLoop(frame: (dt: number) => void, maxDt: number): LoopHandle {
   const timer = new FrameTimer(maxDt);
   let id = 0;
   let running = true;
@@ -75,8 +86,11 @@ export function startLoop(frame: (dt: number) => void, maxDt: number): () => voi
     frame(timer.tick());
   };
   tick();
-  return () => {
-    running = false;
-    cancelAnimationFrame(id);
+  return {
+    stop() {
+      running = false;
+      cancelAnimationFrame(id);
+    },
+    resetClock: () => timer.reset(),
   };
 }

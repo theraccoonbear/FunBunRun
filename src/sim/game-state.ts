@@ -1,7 +1,7 @@
 import { ROUND_SECONDS, RULES } from '../config';
 import { lickPoints, nextCombo, showsNewBest, updatedBest } from './rules';
 
-export type Phase = 'menu' | 'play' | 'over';
+export type Phase = 'menu' | 'play' | 'paused' | 'over';
 
 /** Round bookkeeping: phase, clock, score and lick timers. */
 export interface Session {
@@ -35,7 +35,7 @@ export function createSession(best: number): Session {
   };
 }
 
-/** menu/over -> play. Returns false (and changes nothing) during play. */
+/** menu/over/paused -> play, as a fresh round. Returns false (and changes nothing) during play. */
 export function startRound(s: Session): boolean {
   if (s.phase === 'play') {
     return false;
@@ -47,6 +47,33 @@ export function startRound(s: Session): boolean {
   s.combo = 0;
   s.lastLick = RULES.noLickTime;
   s.elapsed = 0;
+  return true;
+}
+
+/** play -> paused. Returns false (and changes nothing) in any other phase. */
+export function pauseRound(s: Session): boolean {
+  if (s.phase !== 'play') {
+    return false;
+  }
+  s.phase = 'paused';
+  return true;
+}
+
+/** paused -> play, keeping the round as it was. Returns false in any other phase. */
+export function resumeRound(s: Session): boolean {
+  if (s.phase !== 'paused') {
+    return false;
+  }
+  s.phase = 'play';
+  return true;
+}
+
+/** paused -> menu, abandoning the round (the best score is not updated). Returns false in any other phase. */
+export function quitRound(s: Session): boolean {
+  if (s.phase !== 'paused') {
+    return false;
+  }
+  s.phase = 'menu';
   return true;
 }
 
@@ -70,7 +97,8 @@ export interface RoundResult {
 }
 
 /**
- * Counts the round clock down. When it runs out: play -> over, the best
+ * Counts the round clock down (only during play, so it is frozen while
+ * paused). When it runs out: play -> over, the best
  * score is updated and the result is returned; otherwise returns null.
  */
 export function tickClock(s: Session, dt: number): RoundResult | null {

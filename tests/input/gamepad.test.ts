@@ -93,4 +93,36 @@ describe('pollGamepads', () => {
     expect(() => poll(null)).not.toThrow();
     expect(actions.moveX).toBe(0);
   });
+
+  it('Start toggles pause during play and while paused; d-pad moves the menu focus', () => {
+    const actions = new Actions();
+    const edges = new EdgeDetector();
+    let phase: 'menu' | 'play' | 'paused' = 'play';
+    const onStart = vi.fn();
+    const onPause = vi.fn(() => {
+      phase = phase === 'play' ? 'paused' : 'play';
+    });
+    const onNav = vi.fn();
+    const hooks = {
+      isPlaying: () => phase === 'play',
+      isPaused: () => phase === 'paused',
+      onStart,
+      onPause,
+      onNav,
+    };
+    const poll = (p: PadLike): void => pollGamepads([p], edges, actions, hooks, 1 / 60);
+    poll(pad([PAD.start]));
+    expect(phase).toBe('paused');
+    poll(pad([]));
+    poll(pad([PAD.down]));
+    poll(pad([PAD.down]));
+    poll(pad([PAD.up]));
+    expect(onNav.mock.calls).toEqual([[1], [-1]]);
+    poll(pad([PAD.start]));
+    expect(phase).toBe('play');
+    expect(onStart).not.toHaveBeenCalled();
+    // The d-pad does nothing in play.
+    poll(pad([PAD.down]));
+    expect(onNav).toHaveBeenCalledTimes(2);
+  });
 });
