@@ -12,6 +12,10 @@ export interface DebugSnapshot {
   leash: { length: number; handToCollar: number };
   /** Seed of the current world. */
   seed: number;
+  /** Renderer statistics for the last drawn frame. */
+  render: { calls: number; triangles: number };
+  /** Quality tier in effect. */
+  quality: string;
   /** Copies of the prop and bone positions as [x, z] pairs, in generation order. */
   layout: {
     trees: [number, number][];
@@ -39,7 +43,12 @@ declare global {
  * players. The hook only returns copies of plain values, so it cannot
  * change the game.
  */
-export function installDebugHook(game: Game, search: string): void {
+export function installDebugHook(
+  game: Game,
+  search: string,
+  renderer: { info: { render: { calls: number; triangles: number } } },
+  quality: string,
+): void {
   if (!new URLSearchParams(search).has('debug')) {
     return;
   }
@@ -63,6 +72,8 @@ export function installDebugHook(game: Game, search: string): void {
           handToCollar: c ? Math.hypot(hand.x - c.x, hand.y - c.y, hand.z - c.z) : 0,
         },
         seed: game.seed,
+        render: { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles },
+        quality,
         layout: {
           trees: xz(world.trees),
           bushes: xz(world.bushes),

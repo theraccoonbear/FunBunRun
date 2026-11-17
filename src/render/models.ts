@@ -1,6 +1,16 @@
 import * as THREE from 'three';
 import { DOG_MODEL } from '../sim/dog';
 import type { World } from '../sim/world';
+import { segments } from './quality';
+
+/** Shows or hides every blob shadow under `root` (quality tiers). */
+export function setBlobShadows(root: THREE.Object3D, on: boolean): void {
+  root.traverse((o) => {
+    if (o.userData['blobShadow']) {
+      o.visible = on;
+    }
+  });
+}
 
 /** Flat translucent disc under a character. */
 export function blobShadow(parent: THREE.Object3D, r: number): THREE.Mesh {
@@ -15,6 +25,7 @@ export function blobShadow(parent: THREE.Object3D, r: number): THREE.Mesh {
   );
   s.rotation.x = -Math.PI / 2;
   s.position.y = 0.02;
+  s.userData['blobShadow'] = true;
   parent.add(s);
   return s;
 }
@@ -32,6 +43,9 @@ export function makeBunny(): BunnyModel {
   const fur = new THREE.MeshLambertMaterial({ color: 0xf3ece2 });
   const pink = new THREE.MeshLambertMaterial({ color: 0xffa6c9 });
   const dark = new THREE.MeshBasicMaterial({ color: 0x222222 });
+  // One unit sphere for the body parts and one for the ears, scaled per part.
+  const unitSphere = new THREE.SphereGeometry(1, 12, 10);
+  const earSphere = new THREE.SphereGeometry(1, 10, 8);
   const sph = (
     r: number,
     m: THREE.Material,
@@ -42,9 +56,9 @@ export function makeBunny(): BunnyModel {
     sy = 1,
     sz = 1,
   ): THREE.Mesh => {
-    const s = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), m);
+    const s = new THREE.Mesh(unitSphere, m);
     s.position.set(x, y, z);
-    s.scale.set(sx, sy, sz);
+    s.scale.set(r * sx, r * sy, r * sz);
     inner.add(s);
     return s;
   };
@@ -58,10 +72,10 @@ export function makeBunny(): BunnyModel {
   for (const sx of [-1, 1]) {
     const ear = new THREE.Group();
     ear.position.set(0.1 * sx, 0.8, 0.32);
-    const e = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), fur);
+    const e = new THREE.Mesh(earSphere, fur);
     e.scale.set(0.08, 0.32, 0.05);
     e.position.y = 0.26;
-    const inn = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), pink);
+    const inn = new THREE.Mesh(earSphere, pink);
     inn.scale.set(0.05, 0.25, 0.03);
     inn.position.set(0, 0.26, 0.025);
     ear.add(e, inn);
@@ -188,50 +202,101 @@ export function disposeProps(group: THREE.Group): void {
       mesh.geometry.dispose();
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       mats.forEach((m) => m.dispose());
+      if (mesh instanceof THREE.InstancedMesh) {
+        mesh.dispose();
+      }
     }
   });
 }
 
-/** Static props for a generated world; geometry and materials are shared per kind. */
-export function makeProps(world: World): THREE.Group {
+const tmpObj = new THREE.Object3D();
+
+/** One instance of a prop: position, Euler rotation and scale. */
+interface PropPlacement {
+  x: number;
+  y: number;
+  z: number;
+  rx?: number;
+  ry?: number;
+  rz?: number;
+  sx?: number;
+  sy?: number;
+  sz?: number;
+}
+
+/** One draw call for every placement sharing `geo` and `mat`. */
+function instanced(
+  geo: THREE.BufferGeometry,
+  mat: THREE.Material,
+  placements: readonly PropPlacement[],
+): THREE.InstancedMesh {
+  const mesh = new THREE.InstancedMesh(geo, mat, Math.max(1, placements.length));
+  mesh.count = placements.length;
+  placements.forEach((p, i) => {
+    tmpObj.position.set(p.x, p.y, p.z);
+    tmpObj.rotation.set(p.rx ?? 0, p.ry ?? 0, p.rz ?? 0);
+    tmpObj.scale.set(p.sx ?? 1, p.sy ?? 1, p.sz ?? 1);
+    tmpObj.updateMatrix();
+    mesh.setMatrixAt(i, tmpObj.matrix);
+  });
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.computeBoundingSphere();
+  return mesh;
+}
+
+/**
+ * Static props for a generated world: one InstancedMesh per geometry and
+ * material pair (trunks, three leaf colours, bushes, rocks, logs). `detail`
+ * scales radial segment counts (see the quality tiers).
+ */
+export function makeProps(world: World, detail = 1): THREE.Group {
   const g = new THREE.Group();
-  const trunkGeo = new THREE.CylinderGeometry(0.3, 0.4, 2.2, 7);
-  const leafGeo = new THREE.ConeGeometry(1.9, 4.2, 8);
+  const seg = (n: number): number => segments(n, detail);
+  const trunkGeo = new THREE.CylinderGeometry(0.3, 0.4, 2.2, seg(7));
+  const leafGeo = new THREE.ConeGeometry(1.9, 4.2, seg(8));
   const trunkMat = new THREE.MeshLambertMaterial({ color: 0x7a5233 });
   const leafMats = [0x2f8a3c, 0x3d9e48, 0x267a35].map(
     (c) => new THREE.MeshLambertMaterial({ color: c }),
   );
-  for (const t of world.trees) {
-    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-    trunk.position.set(t.x, 1.1, t.z);
-    const leaves = new THREE.Mesh(leafGeo, leafMats[t.variant % leafMats.length]);
-    leaves.position.set(t.x, 4, t.z);
-    leaves.scale.setScalar(t.scale);
-    g.add(trunk, leaves);
-  }
-  const bushGeo = new THREE.SphereGeometry(1.2, 10, 8);
-  const bushMat = new THREE.MeshLambertMaterial({ color: 0x4caf50 });
-  for (const b of world.bushes) {
-    const m = new THREE.Mesh(bushGeo, bushMat);
-    m.position.set(b.x, 0.6, b.z);
-    m.scale.set(1, 0.8, 1);
-    g.add(m);
-  }
-  const rockGeo = new THREE.DodecahedronGeometry(1, 0);
-  const rockMat = new THREE.MeshLambertMaterial({ color: 0x9a9a9a });
-  for (const r of world.rocks) {
-    const m = new THREE.Mesh(rockGeo, rockMat);
-    m.position.set(r.x, 0.5, r.z);
-    m.rotation.set(r.rotX, r.rotY, 0);
-    g.add(m);
-  }
-  const logGeo = new THREE.CylinderGeometry(0.35, 0.35, 4, 8);
-  const logMat = new THREE.MeshLambertMaterial({ color: 0x8b5a2b });
-  for (const l of world.logs) {
-    const m = new THREE.Mesh(logGeo, logMat);
-    m.position.set(l.x, 0.35, l.z);
-    m.rotation.set(0, l.angle, Math.PI / 2);
-    g.add(m);
-  }
+  g.add(
+    instanced(
+      trunkGeo,
+      trunkMat,
+      world.trees.map((t) => ({ x: t.x, y: 1.1, z: t.z })),
+    ),
+  );
+  leafMats.forEach((mat, v) => {
+    const trees = world.trees.filter((t) => t.variant % leafMats.length === v);
+    if (trees.length > 0) {
+      g.add(
+        instanced(
+          leafGeo,
+          mat,
+          trees.map((t) => ({ x: t.x, y: 4, z: t.z, sx: t.scale, sy: t.scale, sz: t.scale })),
+        ),
+      );
+    }
+  });
+  g.add(
+    instanced(
+      new THREE.SphereGeometry(1.2, seg(10), seg(8)),
+      new THREE.MeshLambertMaterial({ color: 0x4caf50 }),
+      world.bushes.map((b) => ({ x: b.x, y: 0.6, z: b.z, sy: 0.8 })),
+    ),
+  );
+  g.add(
+    instanced(
+      new THREE.DodecahedronGeometry(1, 0),
+      new THREE.MeshLambertMaterial({ color: 0x9a9a9a }),
+      world.rocks.map((r) => ({ x: r.x, y: 0.5, z: r.z, rx: r.rotX, ry: r.rotY })),
+    ),
+  );
+  g.add(
+    instanced(
+      new THREE.CylinderGeometry(0.35, 0.35, 4, seg(8)),
+      new THREE.MeshLambertMaterial({ color: 0x8b5a2b }),
+      world.logs.map((l) => ({ x: l.x, y: 0.35, z: l.z, ry: l.angle, rz: Math.PI / 2 })),
+    ),
+  );
   return g;
 }

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ARENA_HALF, CAMERA, COLORS, SNIFF } from '../config';
 import type { Rng } from '../core/rng';
+import type { QualitySettings } from './quality';
 
 /**
  * Colour pipeline matching the r128 prototype. r128 rendered with
@@ -36,10 +37,10 @@ export interface SceneKit {
   resize(): void;
 }
 
-export function createScene(isTouch: boolean, rng: Rng): SceneKit {
-  const renderer = new THREE.WebGLRenderer({ antialias: !isTouch });
+export function createScene(quality: QualitySettings, rng: Rng): SceneKit {
+  const renderer = new THREE.WebGLRenderer({ antialias: quality.antialias });
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatioCap));
   renderer.setSize(innerWidth, innerHeight);
   document.body.insertBefore(renderer.domElement, document.body.firstChild);
 
@@ -49,7 +50,9 @@ export function createScene(isTouch: boolean, rng: Rng): SceneKit {
   const background = sky.clone();
   scene.background = background;
   const fog = new THREE.Fog(sky.clone(), SNIFF.fogNear, SNIFF.normalFogFar);
-  scene.fog = fog;
+  if (quality.fog) {
+    scene.fog = fog;
+  }
   const camera = new THREE.PerspectiveCamera(
     CAMERA.fov,
     innerWidth / innerHeight,
