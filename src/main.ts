@@ -9,8 +9,9 @@ import { Keyboard } from './input/keyboard';
 import { attachPointer, releasePointer } from './input/pointer';
 import { detectTouch, TouchControls } from './input/touch';
 import { loadBest, localStore, saveBest } from './platform/storage';
-import { followCamera, menuCamera } from './render/camera';
+import { createFollowZoom, followCamera, menuCamera, resetFollowZoom } from './render/camera';
 import { Hearts, TrailView, updateSniffAtmosphere } from './render/fx';
+import { ShoutView } from './render/shouts';
 import { disposeProps, makeProps } from './render/models';
 import { configureColorPipeline, createScene } from './render/scene';
 import { BonesView, BunnyView, DogView, PersonView } from './render/views';
@@ -44,6 +45,10 @@ const bonesView = new BonesView(kit.scene, game.bones.length);
 const personView = new PersonView(kit.scene);
 const trailView = new TrailView(kit.scene, game.scent.drops.length);
 const hearts = new Hearts(kit.scene, fxRng);
+const shoutView = new ShoutView(kit.scene, fxRng);
+/** Index of the person's head in the rendered ragdoll points. */
+let headIndex = game.rag.pts.indexOf(game.rag.body.head);
+const zoom = createFollowZoom();
 const sfx = createSfx();
 const hud = new Hud();
 
@@ -82,6 +87,9 @@ game.events.on('world', () => {
 game.events.on('start', () => {
   dogView.place(game.dog);
   personView.bind(game.rag);
+  headIndex = game.rag.pts.indexOf(game.rag.body.head);
+  shoutView.clear();
+  resetFollowZoom(zoom);
   trailView.hideAll();
   menu.hide();
   if (isTouch) {
@@ -100,6 +108,7 @@ game.events.on('yank', (e) => {
   hud.pop(e.message, '#bfe3ff');
   sfx.oof();
 });
+game.events.on('personShout', (e) => shoutView.shout(e.text, e.kind));
 game.events.on('bone', (e) => {
   hud.pop('Bone! +' + e.points, '#ffd34d');
   sfx.bone();
@@ -130,7 +139,7 @@ function frame(dt: number): void {
 
   if (wasPlaying) {
     dogView.sync(r.dog, r.elapsed);
-    followCamera(kit.camera, r.dog, r.camYaw, r.camPitch, game.sprinting, dt);
+    followCamera(kit.camera, r.dog, r.camYaw, r.camPitch, game.sprinting, dt, zoom);
     bunnyView.sync(r.bunny);
     personView.sync(r.pts);
     bonesView.sync(game.bones, r.boneSpin, r.elapsed);
@@ -165,6 +174,7 @@ function frame(dt: number): void {
 
   // Visual-only effects stay per frame.
   hearts.update(dt);
+  shoutView.update(dt, r.pts, headIndex);
   kit.render();
 }
 

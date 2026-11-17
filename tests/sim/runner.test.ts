@@ -147,7 +147,7 @@ function runChase(frames: Frames, seconds = 8): Run {
   const runner = new SimRunner(game);
   const events: string[] = [];
   const knockdowns: number[] = [];
-  for (const type of ['jump', 'lick', 'miss', 'bone', 'yank'] as const) {
+  for (const type of ['jump', 'lick', 'miss', 'bone', 'yank', 'personShout'] as const) {
     game.events.on(type, (e) => events.push(`${runner.ticks}:${type}:${JSON.stringify(e)}`));
   }
   // Knockdown: a step raised the stun timer to the stun time (the person is hit by the leash).
@@ -181,6 +181,8 @@ function simState(g: Game): unknown {
     pts: g.rag.pts.map((p) => ({ ...p })),
     st: structuredClone(g.rag.st),
     rng: g.rng.next(),
+    shouts: { ...g.shouts },
+    shoutRng: g.shoutRng.next(),
   };
 }
 
@@ -242,6 +244,13 @@ describe('leash yank and knockdown detection (#2)', () => {
     const yanks = (r: Run): string[] => r.events.filter((e) => e.includes(':yank:'));
     expect(yanks(run)).toEqual(yanks(reference));
     expect(yanks(run).length).toBeGreaterThan(0);
+  });
+
+  it.each(RATES)('fires the same person shouts on the same steps at %s (#43)', (_, frames) => {
+    const run = runChase(frames);
+    const shouts = (r: Run): string[] => r.events.filter((e) => e.includes(':personShout:'));
+    expect(shouts(run)).toEqual(shouts(reference));
+    expect(shouts(run).length).toBeGreaterThan(0);
   });
 
   it('measures the collar speed over one step: a steady run reads the run speed', () => {
