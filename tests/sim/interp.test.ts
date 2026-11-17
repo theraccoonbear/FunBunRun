@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { SIM } from '../../src/config';
-import { createRng } from '../../src/core/rng';
 import { Game, type StepInput } from '../../src/sim/game';
 import {
   captureState,
@@ -25,7 +24,7 @@ const run: StepInput = {
 const source = { take: (): StepInput => run };
 
 function playing(): Game {
-  const g = new Game({ rng: createRng(8) });
+  const g = new Game({ seed: 8 });
   g.start();
   return g;
 }

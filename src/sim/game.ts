@@ -1,7 +1,7 @@
 import { FX, LEASH_LENGTH, RAGDOLL, RULES, WORLD, YANK_MESSAGES } from '../config';
 import { Emitter } from '../core/events';
 import type { Vec3 } from '../core/math';
-import { mathRandomRng, type Rng } from '../core/rng';
+import { createRng, deriveSeed, mathRandomRng, randomSeed, type Rng } from '../core/rng';
 import {
   createBunny,
   idleBunny,
@@ -49,7 +49,9 @@ export interface GameEvents extends Record<string, unknown> {
   miss: undefined;
   bone: { points: number };
   yank: { message: string };
-  roundOver: RoundResult & { dragged: number };
+  /** The world was regenerated for a new round; rebuild its visuals. */
+  world: undefined;
+  roundOver: RoundResult & { dragged: number; seed: number };
 }
 
 export interface Bone {
@@ -59,8 +61,14 @@ export interface Bone {
   spin: number;
 }
 
+/** Salt for the gameplay stream derived from the world seed. */
+const GAMEPLAY_STREAM_SALT = 0xa11ce;
+
 export interface GameOptions {
-  rng?: Rng;
+  /** Forces this world seed for every round (e.g. from `?seed=`). */
+  seed?: number;
+  /** Where random seeds come from when none is forced. */
+  seedSource?: Rng;
   best?: number;
 }
 
@@ -70,8 +78,14 @@ export interface GameOptions {
  * subscribe to `events`.
  */
 export class Game {
-  readonly rng: Rng;
-  readonly world: World;
+  /** Seed of the current world. */
+  seed = 0;
+  /**
+   * Gameplay randomness (bunny AI, yank messages): a separate stream derived
+   * from the seed, so changing AI code never shifts the world layout.
+   */
+  rng: Rng = createRng(0);
+  world: World;
   readonly events = new Emitter<GameEvents>();
   readonly session: Session;
   readonly dog: DogState = createDog();
@@ -96,15 +110,36 @@ export class Game {
   private readonly ragCollide = (p: Particle): void =>
     collide(this.world.obstacles, this.world.half, p, p.r, 0);
 
+  private readonly forcedSeed: number | undefined;
+  private readonly seedSource: Rng;
+  /** World stream: obstacle, prop and bone placement, including bone respawns. */
+  private worldRng: Rng = createRng(0);
+  private started = false;
+
   constructor(opts: GameOptions = {}) {
-    this.rng = opts.rng ?? mathRandomRng();
+    this.forcedSeed = opts.seed;
+    this.seedSource = opts.seedSource ?? mathRandomRng();
     this.session = createSession(opts.best ?? 0);
-    this.world = generateWorld(this.rng);
+    this.world = this.buildWorld(this.nextSeed());
+    this.rag = this.buildPerson();
+  }
+
+  private nextSeed(): number {
+    return this.forcedSeed ?? randomSeed(this.seedSource);
+  }
+
+  /** Generates the world and bones for `seed` and reseeds both random streams. */
+  private buildWorld(seed: number): World {
+    this.seed = seed;
+    this.worldRng = createRng(seed);
+    this.rng = createRng(deriveSeed(seed, GAMEPLAY_STREAM_SALT));
+    const world = generateWorld(this.worldRng);
+    this.bones.length = 0;
     for (let i = 0; i < WORLD.bones.count; i++) {
-      const { x, z } = freeSpot(this.world.obstacles, WORLD.bones.clearance, this.rng);
+      const { x, z } = freeSpot(world.obstacles, WORLD.bones.clearance, this.worldRng);
       this.bones.push({ x, z, spin: 0 });
     }
-    this.rag = this.buildPerson();
+    return world;
   }
 
   get phase(): Session['phase'] {
@@ -116,6 +151,12 @@ export class Game {
     if (!startRound(this.session)) {
       return false;
     }
+    if (this.started) {
+      // Each round after the first gets a new world (the same one when the seed is forced).
+      this.world = this.buildWorld(this.nextSeed());
+      this.events.emit('world', undefined);
+    }
+    this.started = true;
     resetDog(this.dog);
     resetLook(this.look);
     this.camYaw = this.look.yaw;
@@ -215,7 +256,7 @@ export class Game {
         d.stam = 1;
         s.score += RULES.bonePoints;
         this.events.emit('bone', { points: RULES.bonePoints });
-        const spot = freeSpot(this.world.obstacles, WORLD.bones.clearance, this.rng);
+        const spot = freeSpot(this.world.obstacles, WORLD.bones.clearance, this.worldRng);
         bone.x = spot.x;
         bone.z = spot.z;
       }
@@ -223,7 +264,7 @@ export class Game {
 
     const result = tickClock(s, dt);
     if (result) {
-      this.events.emit('roundOver', { ...result, dragged: this.rag.st.dragged });
+      this.events.emit('roundOver', { ...result, dragged: this.rag.st.dragged, seed: this.seed });
     }
     ageScent(this.scent, dt);
   }

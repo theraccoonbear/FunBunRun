@@ -10,6 +10,16 @@ export interface DebugSnapshot {
   bunny: { x: number; z: number };
   person: { headY: number; dragged: number };
   leash: { length: number; handToCollar: number };
+  /** Seed of the current world. */
+  seed: number;
+  /** Copies of the prop and bone positions as [x, z] pairs, in generation order. */
+  layout: {
+    trees: [number, number][];
+    bushes: [number, number][];
+    rocks: [number, number][];
+    logs: [number, number][];
+    bones: [number, number][];
+  };
 }
 
 export interface DebugHook {
@@ -35,7 +45,9 @@ export function installDebugHook(game: Game, search: string): void {
   }
   const hook: DebugHook = {
     snapshot() {
-      const { session: s, dog: d, bunny: b, rag } = game;
+      const { session: s, dog: d, bunny: b, rag, world } = game;
+      const xz = (list: readonly { x: number; z: number }[]): [number, number][] =>
+        list.map((p) => [p.x, p.z]);
       const hand = rag.body.rHand;
       const c = rag.rope[0];
       return {
@@ -49,6 +61,14 @@ export function installDebugHook(game: Game, search: string): void {
         leash: {
           length: rag.L,
           handToCollar: c ? Math.hypot(hand.x - c.x, hand.y - c.y, hand.z - c.z) : 0,
+        },
+        seed: game.seed,
+        layout: {
+          trees: xz(world.trees),
+          bushes: xz(world.bushes),
+          rocks: xz(world.rocks),
+          logs: xz(world.logs),
+          bones: xz(game.bones),
         },
       };
     },

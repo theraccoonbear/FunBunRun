@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RAGDOLL, SIM } from '../../src/config';
+import { ROUND_SECONDS, RAGDOLL, SIM } from '../../src/config';
 import { createRng } from '../../src/core/rng';
 import { Actions } from '../../src/input/actions';
 import { Game, type StepInput } from '../../src/sim/game';
@@ -142,7 +142,7 @@ interface Run {
 }
 
 function runChase(frames: Frames, seconds = 8): Run {
-  const game = new Game({ rng: createRng(1234) });
+  const game = new Game({ seed: 1234 });
   game.start();
   const runner = new SimRunner(game);
   const events: string[] = [];
@@ -169,6 +169,8 @@ function runChase(frames: Frames, seconds = 8): Run {
  */
 function simState(g: Game): unknown {
   return {
+    seed: g.seed,
+    world: structuredClone(g.world),
     session: { ...g.session },
     dog: structuredClone({ ...g.dog }),
     look: { ...g.look },
@@ -197,6 +199,13 @@ describe('SimRunner determinism', () => {
     expect(reference.game.session.timeLeft).toBeLessThan(90);
   });
 
+  it.each(RATES)('generates the identical seeded world layout at %s', (_, frames) => {
+    const run = runChase(frames);
+    expect(run.game.seed).toBe(1234);
+    expect(run.game.world).toEqual(reference.game.world);
+    expect(run.game.world).toEqual(new Game({ seed: 1234 }).world);
+  });
+
   it.each(RATES)('ends in an identical sim state at %s', (_, frames) => {
     const run = runChase(frames);
     expect(run.runner.ticks).toBe(STEPS);
@@ -207,7 +216,7 @@ describe('SimRunner determinism', () => {
 
   it('keeps the bunny wander identical across frame rates (#3)', () => {
     const wander = (frames: Frames): unknown => {
-      const game = new Game({ rng: createRng(99) });
+      const game = new Game({ seed: 99 });
       game.start();
       // Far from the dog, so the bunny wanders with random turns.
       game.bunny.pos.x = -40;
@@ -236,7 +245,7 @@ describe('leash yank and knockdown detection (#2)', () => {
   });
 
   it('measures the collar speed over one step: a steady run reads the run speed', () => {
-    const game = new Game({ rng: createRng(5) });
+    const game = new Game({ seed: 5 });
     game.start();
     const runner = new SimRunner(game);
     // Run straight long enough to reach a steady walk, at a jittered frame rate.
@@ -262,7 +271,7 @@ describe('edge inputs through the runner', () => {
   ];
 
   function countPresses(frames: Frames, pressFrame: number): Record<string, number> {
-    const game = new Game({ rng: createRng(3) });
+    const game = new Game({ seed: 3 });
     game.start();
     const runner = new SimRunner(game);
     const actions = new Actions();
@@ -289,7 +298,7 @@ describe('edge inputs through the runner', () => {
   });
 
   it('keeps a press made in a frame that runs no step for the next step', () => {
-    const game = new Game({ rng: createRng(3) });
+    const game = new Game({ seed: 3 });
     game.start();
     const runner = new SimRunner(game);
     const actions = new Actions();
@@ -305,7 +314,7 @@ describe('edge inputs through the runner', () => {
   });
 
   it('processes a press once when a long frame drops time', () => {
-    const game = new Game({ rng: createRng(3) });
+    const game = new Game({ seed: 3 });
     game.start();
     const runner = new SimRunner(game);
     const actions = new Actions();
@@ -316,5 +325,30 @@ describe('edge inputs through the runner', () => {
     expect(runner.stepper.pending).toBe(0);
     runner.frame(1, actions);
     expect(licks).toBe(1);
+  });
+});
+
+describe('world regeneration with the runner', () => {
+  it('snaps to the new round instead of blending from the old world', () => {
+    const game = new Game({ seedSource: createRng(21) });
+    game.start();
+    const runner = new SimRunner(game);
+    const worlds: unknown[] = [];
+    game.events.on('world', () => worlds.push(game.world));
+    drive(runner, hz(60), ROUND_SECONDS + 1, new Script(() => ({ moveY: 1 })));
+    expect(game.phase).toBe('over');
+    const firstWorld = game.world;
+    const firstSeed = game.seed;
+
+    game.start();
+    expect(worlds).toHaveLength(1);
+    expect(game.world).not.toBe(firstWorld);
+    expect(game.seed).not.toBe(firstSeed);
+    // Both interpolation ends hold the new round, so whatever alpha is left over renders it exactly.
+    const r = runner.render();
+    expect(r.dog.x).toBe(game.dog.pos.x);
+    expect(r.dog.z).toBe(game.dog.pos.z);
+    expect(r.bunny.x).toBe(game.bunny.pos.x);
+    expect(r.bunny.z).toBe(game.bunny.pos.z);
   });
 });

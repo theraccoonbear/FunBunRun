@@ -39,11 +39,40 @@ export function createRng(seed: number): Rng {
   });
 }
 
-/**
- * Unseeded Rng backed by Math.random. The game uses this by default, so
- * worlds differ per page load as in the prototype; pass createRng(seed) for
- * reproducible runs (#11).
- */
+/** Unseeded Rng backed by Math.random; used for cosmetic randomness and for drawing seeds. */
 export function mathRandomRng(): Rng {
   return rngFrom(() => Math.random());
+}
+
+/** A random 32-bit unsigned seed, drawn from `source` (Math.random by default). */
+export function randomSeed(source: Rng = mathRandomRng()): number {
+  return Math.floor(source.next() * 4294967296) >>> 0;
+}
+
+/**
+ * Derives an independent 32-bit seed for a named stream from a base seed, so
+ * streams (world layout, bunny AI) do not shift each other when one of them
+ * consumes more or fewer numbers.
+ */
+export function deriveSeed(seed: number, salt: number): number {
+  let h = ((seed >>> 0) ^ Math.imul(salt | 0, 0x85ebca6b)) >>> 0;
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x7feb352d);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x846ca68b);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+
+/**
+ * Reads `?seed=<n>` from a URL query string. Accepts a non-negative integer
+ * up to 2^32 - 1; anything else (missing, negative, fractional, junk) is null.
+ */
+export function parseSeed(search: string): number | null {
+  const raw = new URLSearchParams(search).get('seed');
+  if (raw === null || !/^\d{1,10}$/.test(raw)) {
+    return null;
+  }
+  const n = Number(raw);
+  return n <= 0xffffffff ? n : null;
 }

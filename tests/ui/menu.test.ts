@@ -10,7 +10,15 @@ describe('menuHtml', () => {
   });
 
   it('shows the round summary and touch controls', () => {
-    const html = menuHtml(true, { licks: 3, score: 600, dragged: 12.6, newBest: false, best: 900 });
+    const html = menuHtml(true, {
+      licks: 3,
+      score: 600,
+      dragged: 12.6,
+      newBest: false,
+      best: 900,
+      seed: 12345,
+    });
+    expect(html).toContain('World #12345');
     expect(html).toContain('<b>3</b> licks, <b>600</b> points');
     expect(html).toContain('Human dragged: <b>13 m</b>');
     expect(html).toContain('Best: 900');
@@ -20,7 +28,7 @@ describe('menuHtml', () => {
 
   it('celebrates a new best', () => {
     expect(
-      menuHtml(false, { licks: 1, score: 100, dragged: 0, newBest: true, best: 100 }),
+      menuHtml(false, { licks: 1, score: 100, dragged: 0, newBest: true, best: 100, seed: 1 }),
     ).toContain('New best!');
   });
 });
