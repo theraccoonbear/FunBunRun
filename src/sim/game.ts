@@ -24,6 +24,17 @@ import { createLook, resetLook, type Basis, type LookState } from './look';
 import { makeRagdollSim, type Particle, type Ragdoll } from './ragdoll';
 import { canPickBone, createReach, lickReach, type LickReach } from './rules';
 import { ageScent, clearScentTrail, createScentTrail, dropScent, type ScentTrail } from './scent';
+import {
+  createShoutProbe,
+  createShouts,
+  createShoutSense,
+  probeBefore,
+  resetShouts,
+  senseAfter,
+  updateShouts,
+  type ShoutKind,
+  type ShoutState,
+} from './shouts';
 import { freeSpot, generateWorld, type World } from './world';
 
 /** Input for one simulation step, already merged from every device. */
@@ -49,6 +60,8 @@ export interface GameEvents extends Record<string, unknown> {
   miss: undefined;
   bone: { points: number };
   yank: { message: string };
+  /** The person on the leash shouts; the renderer spells `text` out from the head. */
+  personShout: { text: string; kind: ShoutKind };
   /** The world was regenerated for a new round; rebuild its visuals. */
   world: undefined;
   roundOver: RoundResult & { dragged: number; seed: number };
@@ -63,6 +76,8 @@ export interface Bone {
 
 /** Salt for the gameplay stream derived from the world seed. */
 const GAMEPLAY_STREAM_SALT = 0xa11ce;
+/** Salt for the shout stream, kept apart so shouts never shift the bunny AI. */
+const SHOUT_STREAM_SALT = 0x5c4ea3;
 
 export interface GameOptions {
   /** Forces this world seed for every round (e.g. from `?seed=`). */
@@ -85,6 +100,9 @@ export class Game {
    * from the seed, so changing AI code never shifts the world layout.
    */
   rng: Rng = createRng(0);
+  /** Shout timing and phrase choice: its own stream derived from the seed. */
+  shoutRng: Rng = createRng(0);
+  readonly shouts: ShoutState = createShouts();
   world: World;
   readonly events = new Emitter<GameEvents>();
   readonly session: Session;
@@ -115,6 +133,8 @@ export class Game {
   /** World stream: obstacle, prop and bone placement, including bone respawns. */
   private worldRng: Rng = createRng(0);
   private started = false;
+  private readonly shoutProbe = createShoutProbe();
+  private readonly shoutSense = createShoutSense();
 
   constructor(opts: GameOptions = {}) {
     this.forcedSeed = opts.seed;
@@ -133,6 +153,7 @@ export class Game {
     this.seed = seed;
     this.worldRng = createRng(seed);
     this.rng = createRng(deriveSeed(seed, GAMEPLAY_STREAM_SALT));
+    this.shoutRng = createRng(deriveSeed(seed, SHOUT_STREAM_SALT));
     const world = generateWorld(this.worldRng);
     this.bones.length = 0;
     for (let i = 0; i < WORLD.bones.count; i++) {
@@ -162,6 +183,7 @@ export class Game {
     this.camYaw = this.look.yaw;
     resetBunny(this.bunny);
     this.rag = this.buildPerson();
+    resetShouts(this.shouts);
     clearScentTrail(this.scent);
     this.events.emit('start', undefined);
     return true;
@@ -244,10 +266,17 @@ export class Game {
     // per dog step, so the collar speed the yank check sees is the true
     // per-step speed at any frame rate (#2).
     collarWorld(d.pose, this.collar);
-    this.rag.step(dt, this.collar, this.ragCollide);
-    if (this.rag.st.yanked) {
-      this.rag.st.yanked = false;
+    const rag = this.rag;
+    probeBefore(rag.body, dt, this.shoutProbe);
+    rag.step(dt, this.collar, this.ragCollide);
+    if (rag.st.yanked) {
+      rag.st.yanked = false;
       this.events.emit('yank', { message: this.rng.pick(YANK_MESSAGES) });
+    }
+    senseAfter(rag.body, rag.st.tension, this.shoutProbe, dt, this.shoutSense);
+    const shout = updateShouts(this.shouts, this.shoutSense, this.shoutRng, dt);
+    if (shout) {
+      this.events.emit('personShout', shout);
     }
 
     for (const bone of this.bones) {

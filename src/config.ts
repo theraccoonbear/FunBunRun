@@ -96,6 +96,19 @@ export const CAMERA = {
   menuOrbitSpeed: 0.15,
   menuOrbitRadius: 6,
   menuOrbitHeight: 1.6,
+  /**
+   * Sprint pull-back (#43): while sprinting the follow distance eases out to
+   * `boltDistance` and the camera rises by `boltLift`, so the dog appears to
+   * bolt ahead. Rates are exponential (1/s): the gap closes by 1 - e^(-rate*dt)
+   * each frame, at any frame rate.
+   */
+  boltDistance: 9.6,
+  /** Extra camera height (m) at full pull-back. */
+  boltLift: 0.45,
+  /** Ease-out rate when a sprint starts; lower lets the dog pull further ahead first. */
+  boltOutRate: 2.2,
+  /** Ease-in rate when the sprint ends, so the camera settles back in tight. */
+  boltInRate: 3.2,
 } as const;
 
 export const BUNNY = {
@@ -243,3 +256,59 @@ export const FX = {
 } as const;
 
 export const YANK_MESSAGES = ['Yoink!', 'Whoa!', 'Not again!', 'Slow down!'] as const;
+
+/**
+ * Exclamations from the person on the leash (#43). The sim decides when and
+ * what; the renderer spells each shout out letter by letter from the head.
+ */
+export const SHOUT = {
+  /** Pelvis ground speed (m/s) above which the person counts as dragged hard. */
+  dragSpeed: 3.4,
+  /** Leash tension (0..1) that counts as hard dragging while still upright. */
+  dragTension: 0.5,
+  /** Seconds of continuous hard dragging before the first shout. */
+  dragBuildUp: 0.35,
+  /** Random wait between drag shouts while the drag goes on, in seconds. */
+  dragCooldownMin: 2.2,
+  dragCooldownMax: 4.0,
+  /** Downward speed (m/s) of the head or pelvis on touchdown that counts as an impact. */
+  impactSpeed: 3.0,
+  /** Minimum gap between impact shouts. */
+  impactCooldown: 1.4,
+  /** Minimum gap between any two shouts, so spelled-out letters do not overlap much. */
+  minGap: 1.1,
+  /** Long shouts while being dragged. Spaces only add a pause when spelled out. */
+  dragPhrases: [
+    'H E L P !',
+    'whoa!',
+    'slow down!',
+    'aaah!',
+    'my arm!',
+    'heel! heel!',
+    'wait up!',
+    'easy, pup!',
+  ],
+  /** Short shouts on hard landings. */
+  impactPhrases: ['oof!', 'ow!', 'ouch!', 'umph!'],
+} as const;
+
+/** How shouts are spelled out on screen (render only; no effect on the sim). */
+export const SHOUT_FX = {
+  /** Seconds between letters. */
+  letterInterval: 0.09,
+  /** Seconds each letter stays visible. */
+  letterLife: 1.4,
+  /** Letter sprite size in metres. */
+  letterSize: 0.42,
+  /** Spawn height above the head centre. */
+  headOffset: 0.35,
+  /** Upward drift speed (m/s) and random sideways jitter speed. */
+  rise: 0.55,
+  jitter: 0.25,
+  /** Pool size: the most letters on screen at once. */
+  poolSize: 40,
+  /** Shouts waiting to be spelled out; later ones are dropped. */
+  queueSize: 2,
+  dragColor: 0xffffff,
+  impactColor: 0xffe066,
+} as const;
