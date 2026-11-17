@@ -54,7 +54,11 @@ export function pollGamepads(
         hooks.onStart();
       }
     }
-    if (edge(PAD.x) || edge(PAD.rt)) {
+    // Evaluate both edges every poll: with `edge(x) || edge(rt)` a press of X
+    // skipped RT's edge update, so RT fired a second lick on the next frame.
+    const lickX = edge(PAD.x);
+    const lickRT = edge(PAD.rt);
+    if (lickX || lickRT) {
       actions.press('lick');
     }
     if (edge(PAD.start) && !hooks.isPlaying()) {

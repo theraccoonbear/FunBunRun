@@ -68,6 +68,19 @@ describe('pollGamepads', () => {
     expect(actions.lick).toBe(true);
   });
 
+  it('X and RT pressed together lick once, not again on the next frame (double-lick regression)', () => {
+    const { actions, poll } = setup();
+    let licks = 0;
+    for (let frame = 0; frame < 5; frame++) {
+      poll(pad([PAD.x, PAD.rt]));
+      if (actions.lick) {
+        licks++;
+      }
+      actions.endFrame();
+    }
+    expect(licks).toBe(1);
+  });
+
   it('holds sniff on B/LT and sprint on LB/L3', () => {
     const { actions, poll } = setup();
     poll(pad([PAD.lt, PAD.l3]));
