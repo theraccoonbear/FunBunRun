@@ -1,0 +1,40 @@
+name: Deploy Pages
+
+# Publishes the production build to the root of the gh-pages branch.
+# PR previews (deploy-pr-preview.yml) live in gh-pages/pr-<N>/ and are
+# preserved on root publishes. Repo Settings -> Pages -> Source must be
+# "Deploy from a branch" (gh-pages, /root), not "GitHub Actions".
+#
+# Tests are not re-run here; CI (ci.yml) gates PRs into main.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# Runs on main are never cancelled; they queue per ref so the newest main
+# push is the one that ends up published. Concurrent pushes to gh-pages from
+# other workflows are handled by the retried push in
+# .github/scripts/publish-gh-pages.sh.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Publish to gh-pages root
+        run: |
+          .github/scripts/publish-gh-pages.sh publish dist . "deploy: ${GITHUB_SHA}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

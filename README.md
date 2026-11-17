@@ -45,6 +45,20 @@ The game is currently a single-file three.js (r128) prototype in `index.html`. A
 
 Bugs and ideas: [issues](https://github.com/theraccoonbear/FunBunRun/issues).
 
+## Development
+
+Requires Node 22 or newer (`.nvmrc` pins 24).
+
+```sh
+npm ci
+npm run dev          # dev server
+npm run check        # typecheck, lint, format check, unit tests
+npm run build        # production build into dist/
+npm run test:e2e     # Playwright smoke test (run `npx playwright install chromium` once)
+```
+
+Every pull request gets a live preview at `https://theraccoonbear.github.io/FunBunRun/pr-N/` (N is the PR number), posted as a comment by the preview workflow. Previews are removed when the PR closes. See `CLAUDE.md` for branch and review conventions.
+
 ## License
 
 [MIT](LICENSE)

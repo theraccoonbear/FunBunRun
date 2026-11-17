@@ -1,0 +1,21 @@
+name: Feature request
+description: Propose a gameplay or tooling change
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or goal
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+    validations:
+      required: true
+  - type: textarea
+    id: feel
+    attributes:
+      label: Effect on game feel
+      description: Does this change how the game plays (speed, timing, difficulty)?
